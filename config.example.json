@@ -1,0 +1,46 @@
+{
+  "gateway": {
+    "port": 18790,
+    "bind": "127.0.0.1",
+    "auth": {
+      "token": "env:PHOENIX_GATEWAY_TOKEN"
+    }
+  },
+  "agent": {
+    "model": "anthropic/claude-opus-4-6",
+    "maxIterations": 25,
+    "thinkingLevel": "high"
+  },
+  "workspace": "/Users/shanewarehime/phoenix-echo-workspace",
+  "providers": {
+    "anthropic": {
+      "apiKey": "your-anthropic-api-key-here"
+    }
+  },
+  "logging": {
+    "level": "info",
+    "file": "/tmp/phoenix-echo/phoenix-echo.log"
+  },
+  "channels": {
+    "whatsapp": {
+      "enabled": false,
+      "sessionDir": "/Users/shanewarehime/.phoenix-echo/whatsapp-session"
+    },
+    "telegram": {
+      "enabled": false,
+      "botToken": "env:PHOENIX_TELEGRAM_BOT_TOKEN",
+      "pollIntervalMs": 300
+    },
+    "teams": {
+      "enabled": false,
+      "appId": "env:PHOENIX_TEAMS_APP_ID",
+      "appPassword": "env:PHOENIX_TEAMS_APP_PASSWORD",
+      "appTenantId": "env:PHOENIX_TEAMS_APP_TENANT_ID",
+      "serviceUrl": "env:PHOENIX_TEAMS_SERVICE_URL"
+    }
+  },
+  "cron": {
+    "enableOvernightIntel": true,
+    "timezone": "America/Denver"
+  }
+}

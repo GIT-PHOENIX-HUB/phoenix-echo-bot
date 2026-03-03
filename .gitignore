@@ -1,0 +1,20 @@
+node_modules/
+.DS_Store
+*.log
+.phoenix-sessions/
+.phoenix-sessions-vps/
+.phoenix-sessions-studio/
+
+# Local workstation artifacts
+Users/
+
+# Python cache artifacts
+__pycache__/
+*.pyc
+
+# Phoenix master-vision: keep source docs, ignore sensitive outputs
+docs/phoenix-master-vision/Phoenix_Credentials_Inventory.*
+docs/phoenix-master-vision/credentials_summary.json
+docs/phoenix-master-vision/consolidation_report.json
+docs/phoenix-master-vision/evidence/
+docs/phoenix-master-vision/*.pdf
