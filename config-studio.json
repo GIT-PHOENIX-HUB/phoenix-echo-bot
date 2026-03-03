@@ -1,0 +1,24 @@
+{
+  "gateway": {
+    "port": 18790,
+    "bind": "127.0.0.1",
+    "auth": {
+      "token": "env:PHOENIX_GATEWAY_TOKEN"
+    }
+  },
+  "workspace": "~/Phoenix_Local/PHOENIX-ECHO-GATEWAY-MASTER-RUNBOOK",
+  "channels": {
+    "whatsapp": {
+      "enabled": false
+    },
+    "teams": {
+      "enabled": false
+    }
+  },
+  "cron": {
+    "enabled": false,
+    "enableOvernightIntel": false,
+    "timezone": "America/Denver",
+    "jobs": []
+  }
+}

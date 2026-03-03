@@ -1,0 +1,27 @@
+{
+  "id": "st_job_88991",
+  "partitionKey": "job",
+  "jobId": "st_job_88991",
+  "jobNumber": "J-2026-001",
+  "customerId": "40123",
+  "jobType": "Generator",
+  "status": "InProgress",
+  "location": {
+    "city": "Parker",
+    "state": "CO",
+    "zip": "80134"
+  },
+  "schedule": {
+    "start": "2026-02-03",
+    "end": "2026-02-03"
+  },
+  "summary": "Generator install in progress. Awaiting ATS wiring inspection.",
+  "documentsIndex": [
+    {
+      "path": "/SERVICE/Customers/40123_JohnS/Jobs/J-2026-001/Permit.pdf",
+      "sha256": "<sha256>",
+      "docType": "permit"
+    }
+  ],
+  "updatedAt": "2026-01-31T00:00:00Z"
+}

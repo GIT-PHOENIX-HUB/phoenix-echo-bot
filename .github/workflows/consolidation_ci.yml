@@ -1,0 +1,45 @@
+name: consolidation-ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/phoenix-master-vision/**"
+      - "automation/runbooks/**"
+      - ".github/workflows/consolidation_ci.yml"
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Refresh manifest hashes
+        run: |
+          python docs/phoenix-master-vision/scripts/consolidate.py --write-manifest
+
+      - name: Generate consolidation report
+        run: |
+          python docs/phoenix-master-vision/scripts/consolidate.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: phoenix-consolidation-report
+          path: |
+            docs/phoenix-master-vision/memory_manifest.yaml
+            docs/phoenix-master-vision/consolidation_report.json

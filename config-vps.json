@@ -1,0 +1,36 @@
+{
+  "gateway": {
+    "port": 18790,
+    "bind": "127.0.0.1",
+    "auth": {
+      "mode": "token",
+      "token": "env:PHOENIX_GATEWAY_TOKEN"
+    }
+  },
+  "workspace": "/opt/phoenix-echo-gateway/workspace",
+  "anthropic": {
+    "model": "claude-sonnet-4-20250514"
+  },
+  "logging": {
+    "level": "info",
+    "file": "/home/phoenix/.phoenix-echo/gateway.log"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "env:TELEGRAM_BOT_TOKEN",
+      "pollIntervalMs": 300
+    },
+    "whatsapp": {
+      "enabled": false
+    },
+    "teams": {
+      "enabled": false
+    }
+  },
+  "cron": {
+    "enabled": false,
+    "enableOvernightIntel": false,
+    "jobs": []
+  }
+}

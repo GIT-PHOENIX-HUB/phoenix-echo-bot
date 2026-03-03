@@ -1,0 +1,9 @@
+{
+  "from_type": "document",
+  "from_id": "doc_123",
+  "to_type": "customer",
+  "to_id": "40123",
+  "relationship_type": "mentions",
+  "confidence": 0.92,
+  "evidence": "CustomerID: 40123 found in text; folder path match."
+}

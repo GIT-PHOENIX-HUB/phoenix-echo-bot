@@ -1,0 +1,2 @@
+note_id,customer_id,job_id,note_type,note_text,created_at,created_by,source_path,source_doc_id,pii_flag
+note_001,40123,st_job_88991,dispatch,"Gate code is ...",2026-01-01,dispatcher,SERVICE/.../notes.md,doc_00000001,true

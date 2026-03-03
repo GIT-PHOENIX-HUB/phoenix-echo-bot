@@ -1,0 +1,2 @@
+site_id,list_id,title,type,item_count,has_unique_perms,retention_label
+site_01,lib_01,SERVICE,library,9999,false,

@@ -1,0 +1,42 @@
+name: Full-build CI
+
+on:
+  pull_request:
+    paths:
+      - "Full-build/**"
+      - ".github/workflows/full-build-ci.yml"
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "Full-build/**"
+      - ".github/workflows/full-build-ci.yml"
+
+jobs:
+  lint-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: Full-build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: Full-build/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run checks
+        run: npm run check
+
+      - name: Review gate status (non-blocking)
+        continue-on-error: true
+        run: npm run review:poll -- --timeout-ms 1000 --interval-ms 200

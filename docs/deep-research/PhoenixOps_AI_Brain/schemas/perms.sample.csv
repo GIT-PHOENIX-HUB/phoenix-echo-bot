@@ -1,0 +1,2 @@
+object_type,object_id,principal,role,inherited,source
+folder,_AI_MEMORY/Ops/Runbooks,Owners,FullControl,true,graph

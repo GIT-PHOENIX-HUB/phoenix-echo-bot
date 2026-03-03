@@ -1,0 +1,2 @@
+doc_id,path,title,modified,hash,mime,pii_flag,content
+doc_00000001,SERVICE/Customers/40123/notes.md,notes,2026-01-01,<sha256>,text/markdown,true,"Customer called..."

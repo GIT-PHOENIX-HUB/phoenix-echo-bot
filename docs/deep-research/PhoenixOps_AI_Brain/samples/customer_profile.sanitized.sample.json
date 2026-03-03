@@ -1,0 +1,33 @@
+{
+  "id": "40123",
+  "partitionKey": "customer",
+  "customerId": "40123",
+  "customerType": "Residential",
+  "nameDisplay": "John S.",
+  "contacts": {
+    "emailMasked": "j***@example.com",
+    "phoneMasked": "(***) ***-**12"
+  },
+  "address": {
+    "city": "Parker",
+    "state": "CO",
+    "zip": "80134"
+  },
+  "categories": {
+    "NC": {},
+    "Service": {},
+    "Remodel": {},
+    "Generator": {
+      "make": "Generac",
+      "model": "24kW Guardian",
+      "serialMasked": "****A1B2",
+      "kwRating": 24,
+      "fuelType": "NG",
+      "installDate": "2024-09-12"
+    }
+  },
+  "links": {
+    "customerFolder": "/SERVICE/Customers/40123_JohnS/"
+  },
+  "updatedAt": "2026-01-31T00:00:00Z"
+}

@@ -1,0 +1,25 @@
+{
+  "run_id": "20260131_full_run",
+  "started_at": "2026-01-31T00:00:00Z",
+  "export_path": "/path/to/sharepoint_export",
+  "counts": {
+    "files_total": 12345,
+    "documents_extracted": 9876,
+    "customers": 618,
+    "jobs": 1704
+  },
+  "pii": {
+    "emails": 1200,
+    "phones": 900,
+    "addresses": 600,
+    "ssn_like": 0,
+    "payment_tokens": 0
+  },
+  "upload": {
+    "enabled": false,
+    "target_site": "/sites/PhoenixOps",
+    "target_root": "/_AI_MEMORY/",
+    "files_to_upload": 4321
+  },
+  "errors": []
+}
