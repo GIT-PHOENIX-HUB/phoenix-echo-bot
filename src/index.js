@@ -205,7 +205,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 configureToolRuntime({
   workspace: WORKSPACE,
-  maxExecTimeoutSec: Number(process.env.PHOENIX_MAX_EXEC_TIMEOUT_SEC || 120),
+  maxExecTimeoutSec: Number(process.env.PHOENIX_MAX_EXEC_TIMEOUT_SEC ?? 0),
   execAllowPattern: String(process.env.PHOENIX_EXEC_ALLOW || '')
 });
 
