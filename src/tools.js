@@ -99,6 +99,9 @@ function enforceExecPolicy(command) {
 }
 
 function sanitizeTimeoutSeconds(inputTimeout) {
+  if (runtimeConfig.maxExecTimeoutSec === 0) {
+    return 0; // timeout disabled
+  }
   const parsed = Number(inputTimeout);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return 30;
@@ -122,7 +125,9 @@ export function configureToolRuntime(options = {}) {
   }
   if (options.maxExecTimeoutSec != null) {
     const val = Number(options.maxExecTimeoutSec);
-    if (Number.isFinite(val) && val > 0) {
+    if (val === 0) {
+      runtimeConfig.maxExecTimeoutSec = 0; // disable timeout
+    } else if (Number.isFinite(val) && val > 0) {
       runtimeConfig.maxExecTimeoutSec = Math.min(Math.floor(val), 600);
     }
   }
@@ -272,7 +277,7 @@ async function execTool({ command, workdir, timeout = 30 }) {
   try {
     const options = {
       cwd: safeCwd,
-      timeout: safeTimeout * 1000,
+      timeout: safeTimeout === 0 ? 0 : safeTimeout * 1000,
       maxBuffer: 10 * 1024 * 1024 // 10MB
     };
 
