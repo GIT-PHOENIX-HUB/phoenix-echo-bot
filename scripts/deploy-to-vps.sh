@@ -8,7 +8,7 @@
 #   3. Installs any new dependencies on VPS
 #   4. Restarts the phoenix-echo service
 #
-# Created: 2026-03-02 by Echo Pro
+# Created: 2026-03-02 by Phoenx Echo
 
 set -euo pipefail
 

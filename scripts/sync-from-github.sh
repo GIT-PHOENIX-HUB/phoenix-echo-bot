@@ -6,7 +6,7 @@
 #   1. Pulls latest from GitHub to Studio
 #   2. Optionally deploys to VPS
 #
-# Created: 2026-03-02 by Echo Pro
+# Created: 2026-0302 by Phoenix Echo
 
 set -euo pipefail
 
