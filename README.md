@@ -2,7 +2,7 @@
 
 **Independent AI Gateway for Phoenix Electric LLC**
 
-A self-hosted AI assistant gateway built from scratch for full sovereignty.
+A self-hosted AI operationalsteward gateway built from scratch for full sovereignty.
 
 ## Status
 
