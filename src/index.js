@@ -33,6 +33,20 @@ import { configureDefaultLogger, getDefaultLogger } from './logger.js';
 import { createChannelsManager } from './channels-integration.js';
 import { loadRunbookOverview } from './runbooks.js';
 import { getBrainBlueprint, updateBrainChecklistStep } from './brain-blueprint.js';
+import { MessageRouter } from './message-router.js';
+import { PluginManager } from './plugins/plugin-manager.js';
+import electricalGuru from './plugins/electrical-guru.js';
+import servicefusion from './plugins/servicefusion.js';
+import phoenixKnowledge from './plugins/phoenix-knowledge.js';
+import rexel from './plugins/rexel.js';
+import { EchoPersistence } from './echo-persistence.js';
+import { GatewayClient } from './gateway-client.js';
+import { buildIdentityPrompt, detectAudience } from './echo-identity.js';
+import { registerMiniAppRoutes } from './miniapp-routes.js';
+import { TeamsAdapter } from './adapters/teams-adapter.js';
+import { TelegramAdapter } from './adapters/telegram-adapter.js';
+import { WhatsAppAdapter } from './adapters/whatsapp-adapter.js';
+import { EmailAdapter } from './adapters/email-adapter.js';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(SCRIPT_DIR, '..');
@@ -248,6 +262,90 @@ try {
   channelsManager = null;
 }
 
+// Initialize Echo Persistence (per-user memory, per-channel state)
+const echoPersistence = new EchoPersistence(WORKSPACE);
+
+// Initialize Plugin Manager with all skill plugins
+const pluginManager = new PluginManager();
+pluginManager.register(electricalGuru);
+pluginManager.register(servicefusion);
+pluginManager.register(phoenixKnowledge);
+pluginManager.register(rexel);
+
+try {
+  await pluginManager.init();
+  logger.info('Plugin manager initialized', { plugins: pluginManager.list().map((p) => p.id) });
+} catch (error) {
+  logger.error('Failed to initialize plugin manager', { error: error.message });
+}
+
+// Initialize Message Router with platform adapters
+const messageRouter = new MessageRouter({
+  handleMessage: async (sessionId, text, context) => handleMessage(sessionId, text, context),
+  pluginRouter: async (msg, context) => pluginManager.route(msg, context),
+  buildContext: async (msg) => echoPersistence.buildContext(msg)
+});
+
+// Register adapters based on config
+if (config.channels?.teams?.enabled) {
+  messageRouter.registerAdapter('teams', new TeamsAdapter({
+    config: config.channels.teams
+  }));
+}
+if (config.channels?.telegram?.enabled) {
+  messageRouter.registerAdapter('telegram', new TelegramAdapter({
+    config: {
+      botToken: config.channels.telegram.botToken,
+      miniappUrl: process.env.PHOENIX_TELEGRAM_MINIAPP_URL || '',
+      pollIntervalMs: config.channels.telegram.pollIntervalMs
+    }
+  }));
+}
+if (config.channels?.whatsapp?.enabled) {
+  messageRouter.registerAdapter('whatsapp', new WhatsAppAdapter({
+    config: config.channels.whatsapp
+  }));
+}
+if (process.env.PHOENIX_EMAIL_ENABLED === 'true') {
+  messageRouter.registerAdapter('email', new EmailAdapter({
+    config: {
+      imapHost: process.env.PHOENIX_EMAIL_IMAP_HOST || '',
+      imapPort: Number(process.env.PHOENIX_EMAIL_IMAP_PORT) || 993,
+      smtpHost: process.env.PHOENIX_EMAIL_SMTP_HOST || '',
+      smtpPort: Number(process.env.PHOENIX_EMAIL_SMTP_PORT) || 587,
+      address: process.env.PHOENIX_EMAIL_ADDRESS || '',
+      password: process.env.PHOENIX_EMAIL_PASSWORD || ''
+    }
+  }));
+}
+
+// Initialize adapters (non-blocking; individual adapter failures do not block startup)
+messageRouter.init().catch((error) => {
+  logger.error('Message router initialization error', { error: error.message });
+});
+
+// Initialize Gateway WebSocket Client
+// TODO(gateway): Connect to Phoenix Echo Gateway for real-time state sync
+const gatewayClient = new GatewayClient({
+  url: process.env.PHOENIX_GATEWAY_WS_URL || '',
+  token: config.gateway?.auth?.token || '',
+  onMessage: (msg) => {
+    logger.debug('Gateway message received', { type: msg.type });
+  },
+  onStateChange: (state, previousStatus) => {
+    logger.info('Gateway connection state changed', {
+      from: previousStatus,
+      to: state.status
+    });
+  }
+});
+
+if (process.env.PHOENIX_GATEWAY_WS_URL) {
+  gatewayClient.connect().catch((error) => {
+    logger.error('Gateway client connect error', { error: error.message });
+  });
+}
+
 // Middleware
 app.use((req, res, next) => {
   req.requestId = randomUUID();
@@ -276,6 +374,7 @@ const chatLimiter = rateLimit({
 
 app.use('/api', generalApiLimiter);
 app.use('/api/chat', chatLimiter);
+app.use('/api/miniapp', chatLimiter);
 const teamsRouteHandler = channelsManager?.getTeamsRouteHandler() || null;
 
 app.use('/api', (req, res, next) => {

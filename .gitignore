@@ -1,9 +1,11 @@
 node_modules/
 .DS_Store
 *.log
+.env
 .phoenix-sessions/
 .phoenix-sessions-vps/
 .phoenix-sessions-studio/
+.phoenix-echo-memory/
 
 # Local workstation artifacts
 Users/
