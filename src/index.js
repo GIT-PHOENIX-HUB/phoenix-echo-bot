@@ -30,6 +30,7 @@ import { loadConfig, createConfigWatcher } from './config.js';
 import { configureDefaultLogger, getDefaultLogger } from './logger.js';
 import { MessageRouter } from './message-router.js';
 import { TeamsAdapter } from './adapters/teams-adapter.js';
+import { TelegramAdapter } from './adapters/telegram-adapter.js';
 import { CronScheduler, createOvernightIntelJobs } from './cron.js';
 import { registerMiniAppRoutes } from './miniapp-routes.js';
 import { loadRunbookOverview } from './runbooks.js';
@@ -231,6 +232,29 @@ if (teamsConfig.enabled && teamsConfig.appId) {
     logger.info('Teams adapter initialized and registered');
   } catch (error) {
     logger.error('Failed to initialize Teams adapter', { error: error.message });
+  }
+}
+
+// Initialize Telegram adapter if configured (with voice support)
+const telegramConfig = config.channels?.telegram || { enabled: false };
+if (telegramConfig.enabled && telegramConfig.botToken) {
+  try {
+    const telegramAdapter = new TelegramAdapter({
+      ...telegramConfig,
+      whisperApiKey: process.env.OPENAI_API_KEY || telegramConfig.whisperApiKey,
+      whisperModel: telegramConfig.whisperModel || 'whisper-1'
+    }, async (message) => {
+      const sessionId = `telegram-${message.chatId}`;
+      const response = await handleMessage(sessionId, message.text, {
+        source: 'telegram', from: message.fromName, chatId: message.chatId, messageType: message.messageType
+      });
+      if (message.reply) await message.reply(response);
+      return response;
+    });
+    messageRouter.registerAdapter('telegram', telegramAdapter);
+    logger.info('Telegram adapter initialized with voice support');
+  } catch (error) {
+    logger.error('Failed to initialize Telegram adapter', { error: error.message });
   }
 }
 
