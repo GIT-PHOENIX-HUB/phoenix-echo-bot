@@ -79,6 +79,15 @@ export class TelegramAdapter {
     try {
       // 1. Get file path from Telegram
       const file = await this.bot.getFile(fileId);
+
+      // 1a. File size guard — reject files over 5MB to prevent memory exhaustion
+      const maxFileSize = this.config.maxVoiceFileSize || 5 * 1024 * 1024;
+      if (file.file_size && file.file_size > maxFileSize) {
+        logger.warn('Voice file too large', { chatId, fileSize: file.file_size, maxFileSize });
+        await this.bot.sendMessage(chatId, 'That voice message is too large to process. Please send a shorter message (under 1 minute).');
+        return;
+      }
+
       const fileUrl = `https://api.telegram.org/file/bot${this.config.botToken}/${file.file_path}`;
 
       // 2. Download audio
@@ -110,11 +119,12 @@ export class TelegramAdapter {
       // 5. Respond to same chat
       if (response) await this.bot.sendMessage(chatId, response);
     } catch (error) {
-      // 6. Never silently drop — send explicit error
+      // 6. Never silently drop — send explicit error (but don't leak internals to user)
       logger.error('Voice transcription failed', { chatId, error: error.message });
-      await this.bot.sendMessage(chatId,
-        `I received your voice message but couldn't process it: ${error.message}\n\nPlease try again or type your message.`
-      );
+      const userMessage = error.name === 'AbortError'
+        ? 'Voice processing timed out. Please try a shorter message or type your request.'
+        : 'I received your voice message but couldn\'t process it right now. Please try again or type your message.';
+      await this.bot.sendMessage(chatId, userMessage);
     }
   }
 
@@ -134,17 +144,27 @@ export class TelegramAdapter {
     const footer = Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\n${whisperModel}\r\n--${boundary}--\r\n`);
     const body = Buffer.concat([header, audioBuffer, footer]);
 
-    const response = await fetch(whisperEndpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${whisperApiKey}`, 'Content-Type': `multipart/form-data; boundary=${boundary}` },
-      body
-    });
+    // Timeout guard — abort Whisper call after 45 seconds to prevent indefinite hangs
+    const whisperTimeout = this.config.whisperTimeout || 45000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), whisperTimeout);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Whisper API error (${response.status}): ${errorText}`);
+    try {
+      const response = await fetch(whisperEndpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${whisperApiKey}`, 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+        body,
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Whisper API error (${response.status}): ${errorText}`);
+      }
+      return (await response.json()).text || '';
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return (await response.json()).text || '';
   }
 
   async sendMessage(chatId, message) {
