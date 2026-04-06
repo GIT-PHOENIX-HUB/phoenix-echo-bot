@@ -21,8 +21,6 @@ import { readdir, stat } from 'fs/promises';
 import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import Anthropic from '@anthropic-ai/sdk';
-
 import { SessionManager } from './session.js';
 import { AgentRunner } from './agent.js';
 import { loadSystemPrompt } from './prompt.js';
@@ -30,7 +28,11 @@ import { tools, executeToolCall, configureToolRuntime } from './tools.js';
 import { resolveAnthropicAuth } from './auth.js';
 import { loadConfig, createConfigWatcher } from './config.js';
 import { configureDefaultLogger, getDefaultLogger } from './logger.js';
-import { createChannelsManager } from './channels-integration.js';
+import { MessageRouter } from './message-router.js';
+import { TeamsAdapter } from './adapters/teams-adapter.js';
+import { TelegramAdapter } from './adapters/telegram-adapter.js';
+import { CronScheduler, createOvernightIntelJobs } from './cron.js';
+import { registerMiniAppRoutes } from './miniapp-routes.js';
 import { loadRunbookOverview } from './runbooks.js';
 import { getBrainBlueprint, updateBrainChecklistStep } from './brain-blueprint.js';
 
@@ -194,9 +196,6 @@ try {
   process.exit(1);
 }
 
-// Create the Anthropic client once and reuse it across all requests
-const anthropicClient = new Anthropic(authConfig.clientOptions);
-
 // Initialize components
 const sessionManager = new SessionManager(WORKSPACE);
 const app = express();
@@ -209,44 +208,105 @@ configureToolRuntime({
   execAllowPattern: String(process.env.PHOENIX_EXEC_ALLOW || '')
 });
 
-// Initialize channels manager (WhatsApp, Teams, Cron)
-let channelsManager;
-try {
-  const channelsConfig = {
-    timezone: config.cron?.timezone || 'America/Denver',
-    cron: config.cron || {
-      enabled: false,
-      enableOvernightIntel: false,
-      timezone: 'America/Denver',
-      jobs: []
-    },
-    whatsapp: config.channels?.whatsapp || { enabled: false },
-    telegram: config.channels?.telegram || { enabled: false },
-    teams: config.channels?.teams || { enabled: false }
-  };
+// Initialize message router and adapters
+const messageRouter = new MessageRouter();
 
-  channelsManager = await createChannelsManager(channelsConfig, async (sessionId, message, context) => {
-    // Route channel messages to handleMessage
-    const response = await handleMessage(sessionId, message);
-    
-    // Reply via the channel's reply function if provided
-    if (context?.reply) {
-      await context.reply(response);
-    }
-    
-    return response;
-  });
-
-  logger.info('Channels manager initialized', {
-    whatsapp: !!channelsManager.getWhatsAppChannel(),
-    telegram: !!channelsManager.getTelegramChannel(),
-    teams: !!channelsManager.getTeamsChannel(),
-    cronJobs: channelsManager.getCronScheduler().listJobs().length
-  });
-} catch (error) {
-  logger.error('Failed to initialize channels manager', { error: error.message });
-  channelsManager = null;
+// Initialize Teams adapter if configured
+let teamsAdapter = null;
+const teamsConfig = config.channels?.teams || { enabled: false };
+if (teamsConfig.enabled && teamsConfig.appId) {
+  try {
+    teamsAdapter = new TeamsAdapter(teamsConfig, async (message) => {
+      const sessionId = `teams-${message.conversationId}`;
+      const response = await handleMessage(sessionId, message.text, {
+        source: 'teams',
+        from: message.fromName,
+        conversationId: message.conversationId
+      });
+      if (message.reply) {
+        await message.reply(response);
+      }
+      return response;
+    });
+    messageRouter.registerAdapter('teams', teamsAdapter);
+    logger.info('Teams adapter initialized and registered');
+  } catch (error) {
+    logger.error('Failed to initialize Teams adapter', { error: error.message });
+  }
 }
+
+// Initialize Telegram adapter if configured (with voice support)
+const telegramConfig = config.channels?.telegram || { enabled: false };
+if (telegramConfig.enabled && telegramConfig.botToken) {
+  try {
+    const telegramAdapter = new TelegramAdapter({
+      ...telegramConfig,
+      whisperApiKey: process.env.OPENAI_API_KEY || telegramConfig.whisperApiKey,
+      whisperModel: telegramConfig.whisperModel || 'whisper-1'
+    }, async (message) => {
+      const sessionId = `telegram-${message.chatId}`;
+      const response = await handleMessage(sessionId, message.text, {
+        source: 'telegram', from: message.fromName, chatId: message.chatId, messageType: message.messageType
+      });
+      if (message.reply) await message.reply(response);
+      return response;
+    });
+    messageRouter.registerAdapter('telegram', telegramAdapter);
+    logger.info('Telegram adapter initialized with voice support');
+  } catch (error) {
+    logger.error('Failed to initialize Telegram adapter', { error: error.message });
+  }
+}
+
+// Initialize cron scheduler standalone
+const cronScheduler = new CronScheduler({
+  timezone: config.cron?.timezone || 'America/Denver'
+});
+
+cronScheduler.registerHandler('systemEvent', async (job, payload) => {
+  logger.info('Executing systemEvent job', { jobId: job.id, payload });
+});
+
+cronScheduler.registerHandler('agentTurn', async (job, payload) => {
+  logger.info('Executing agentTurn job', { jobId: job.id, sessionId: payload.sessionId });
+  return await handleMessage(payload.sessionId, payload.message, {
+    source: 'cron', jobId: job.id, jobName: job.name
+  });
+});
+
+const cronJobs = Array.isArray(config.cron?.jobs) ? config.cron.jobs : [];
+if (config.cron?.enabled && cronJobs.length > 0) {
+  for (const job of cronJobs) {
+    try {
+      cronScheduler.scheduleJob({
+        id: job.id,
+        name: job.name || job.id,
+        schedule: job.schedule,
+        type: String(job.type || 'agentTurn').trim(),
+        payload: {
+          ...(job.payload || {}),
+          sessionId: job.payload?.sessionId || job.sessionId || 'main',
+          message: job.payload?.message || job.message || ''
+        },
+        enabled: job.enabled !== false,
+        timezone: config.cron?.timezone || 'America/Denver'
+      });
+    } catch (error) {
+      logger.error('Failed to schedule cron job', { jobId: job?.id, error: error.message });
+    }
+  }
+}
+
+if (config.cron?.enableOvernightIntel === true) {
+  createOvernightIntelJobs(cronScheduler, async (sessionId, message) => {
+    return await handleMessage(sessionId, message);
+  });
+}
+
+logger.info('Message router and cron scheduler initialized', {
+  adapters: Array.from(messageRouter.adapters.keys()),
+  cronJobs: cronScheduler.listJobs().length
+});
 
 // Middleware
 app.use((req, res, next) => {
@@ -276,7 +336,7 @@ const chatLimiter = rateLimit({
 
 app.use('/api', generalApiLimiter);
 app.use('/api/chat', chatLimiter);
-const teamsRouteHandler = channelsManager?.getTeamsRouteHandler() || null;
+const teamsRouteHandler = teamsAdapter ? teamsAdapter.createRouteHandler() : null;
 
 app.use('/api', (req, res, next) => {
   // Teams webhook authentication is handled by Bot Framework adapter.
@@ -341,31 +401,35 @@ if (teamsRouteHandler) {
   logger.info('Teams /api/messages endpoint registered');
 }
 
+// Register miniapp routes
+registerMiniAppRoutes(app, {
+  handleMessage,
+  pluginManager: null,
+  persistence: sessionManager
+});
+
 // Cron jobs API
-if (channelsManager?.getCronScheduler()) {
-  app.get('/api/cron/jobs', async (req, res) => {
-    try {
-      const jobs = channelsManager.getCronScheduler().listJobs();
-      res.json({ jobs, requestId: req.requestId });
-    } catch (error) {
-      logger.error('Failed to list cron jobs', { error: error.message });
-      res.status(500).json({ error: error.message, requestId: req.requestId });
-    }
-  });
-}
+app.get('/api/cron/jobs', async (req, res) => {
+  try {
+    const jobs = cronScheduler.listJobs();
+    res.json({ jobs, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Failed to list cron jobs', { error: error.message });
+    res.status(500).json({ error: error.message, requestId: req.requestId });
+  }
+});
 
 // Channel status API
-if (channelsManager) {
-  app.get('/api/channels/status', (req, res) => {
-    try {
-      const status = channelsManager.getStatus();
-      res.json({ ...status, requestId: req.requestId });
-    } catch (error) {
-      logger.error('Failed to load channel status', { error: error.message });
-      res.status(500).json({ error: error.message, requestId: req.requestId });
-    }
-  });
-}
+app.get('/api/channels/status', (req, res) => {
+  try {
+    const routerStatus = messageRouter.getStatus();
+    const jobs = cronScheduler.listJobs();
+    res.json({ ...routerStatus, cronJobs: jobs, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Failed to load channel status', { error: error.message });
+    res.status(500).json({ error: error.message, requestId: req.requestId });
+  }
+});
 
 // Recovery details for operators
 app.get('/api/recovery', async (req, res) => {
@@ -494,7 +558,8 @@ async function getDashboardOverview(limit = 10) {
     getBrainBlueprint(WORKSPACE).catch(() => null)
   ]);
 
-  const channels = channelsManager ? channelsManager.getStatus() : { channels: {}, cronJobs: [] };
+  const routerStatus = messageRouter.getStatus();
+  const channels = { ...routerStatus, cronJobs: cronScheduler.listJobs() };
   const uptimeSec = process.uptime();
   const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
 
@@ -966,14 +1031,18 @@ async function gracefulShutdown(signal, cause = null) {
     logEvent('info', 'shutdown_config_watcher_stopped');
   }
 
-  // Shutdown channels manager
-  if (channelsManager) {
-    try {
-      await channelsManager.shutdown();
-      logEvent('info', 'shutdown_channels_stopped');
-    } catch (error) {
-      logEvent('error', 'shutdown_channels_failed', { message: error.message });
-    }
+  // Shutdown message router and cron scheduler
+  try {
+    await messageRouter.cleanup();
+    logEvent('info', 'shutdown_message_router_stopped');
+  } catch (error) {
+    logEvent('error', 'shutdown_message_router_failed', { message: error.message });
+  }
+  try {
+    cronScheduler.shutdown();
+    logEvent('info', 'shutdown_cron_stopped');
+  } catch (error) {
+    logEvent('error', 'shutdown_cron_failed', { message: error.message });
   }
 
   clearTimeout(forcedExit);
@@ -1204,7 +1273,7 @@ async function handleMessage(sessionId, userMessage, context = {}) {
   try {
     const systemPrompt = await loadSystemPrompt(WORKSPACE);
     const agent = new AgentRunner({
-      client: anthropicClient,
+      clientOptions: authConfig.clientOptions,
       systemPrompt,
       tools,
       executeToolCall,
