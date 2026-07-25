@@ -405,8 +405,7 @@ if (teamsRouteHandler) {
 registerMiniAppRoutes(app, {
   handleMessage,
   pluginManager: null,
-  persistence: sessionManager
-});
+  persistence: sessionManager, runtime: config.runtime});
 
 // Cron jobs API
 app.get('/api/cron/jobs', async (req, res) => {

@@ -13,6 +13,11 @@ const DEFAULT_CONFIG = {
     }
   },
   workspace: '',
+  runtime: {
+    baseUrl: 'http://127.0.0.1:9120',
+    wsUrl: 'ws://127.0.0.1:9120/ws',
+    token: ''
+  },
   agent: {
     model: 'claude-sonnet-4-5-20250929',
     maxIterations: 25,
