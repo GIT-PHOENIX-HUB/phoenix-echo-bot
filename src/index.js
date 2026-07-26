@@ -201,6 +201,7 @@ try {
 // Initialize components
 const sessionManager = new SessionManager(WORKSPACE);
 const app = express();
+app.set('trust proxy', 'loopback');
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -417,7 +418,7 @@ if (miniAppConfig.enabled) {
     pluginManager: null,
     persistence: sessionManager,
     runtime: config.runtime,
-    miniApp: miniAppConfig
+    miniApp: () => config.channels?.miniApp || miniAppConfig
   });
   logger.info('Mini App routes enabled', {
     allowedOrigin: miniAppConfig.allowedOrigin || 'same-origin-only'

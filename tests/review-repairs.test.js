@@ -178,6 +178,27 @@ test('runtime forwarding aborts at the configured timeout', async () => {
   );
 });
 
+test('runtime client errors remain client errors', async () => {
+  await assert.rejects(
+    forwardMiniAppSubmission({
+      type: 'service_request',
+      category: 'lighting',
+      name: 'A',
+      phone: '1'
+    }, {
+      runtime: { baseUrl: 'http://127.0.0.1:9120', timeoutMs: 100 },
+      fetchImpl: async () => ({
+        ok: false,
+        status: 422,
+        async text() {
+          return 'missing required field';
+        }
+      })
+    }),
+    (error) => error.status === 422 && error.message === 'Submission rejected'
+  );
+});
+
 test('configured Mini App CORS allows only one absolute HTTP(S) origin', () => {
   assert.equal(
     configuredMiniAppOrigin('https://echo.phoenixelectric.life/miniapp'),
@@ -247,6 +268,65 @@ test('configured Mini App CORS allows only one absolute HTTP(S) origin', () => {
   }, rejected);
   assert.equal(rejected.statusCode, 403);
   assert.match(rejected.body.error, /not allowed/);
+});
+
+test('blank Mini App allowlist permits only the request same-origin and reloads dynamically', () => {
+  const routes = {};
+  let currentConfig = { allowedOrigin: '' };
+  const app = {
+    options(path, handler) {
+      routes[`OPTIONS ${path}`] = handler;
+    },
+    post() {},
+    get() {}
+  };
+  registerMiniAppRoutes(app, {
+    miniApp: () => currentConfig
+  });
+
+  const response = () => ({
+    headers: {},
+    statusCode: null,
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+    end() {
+      this.ended = true;
+      return this;
+    }
+  });
+  const request = (origin) => ({
+    protocol: 'https',
+    requestId: 'req',
+    get(name) {
+      if (name === 'Origin') return origin;
+      if (name === 'Host') return 'echo.example';
+      return '';
+    }
+  });
+
+  const sameOrigin = response();
+  routes['OPTIONS /api/miniapp/submit'](request('https://echo.example'), sameOrigin);
+  assert.equal(sameOrigin.statusCode, 204);
+  assert.equal(sameOrigin.headers['Access-Control-Allow-Origin'], 'https://echo.example');
+
+  const crossOrigin = response();
+  routes['OPTIONS /api/miniapp/submit'](request('https://attacker.example'), crossOrigin);
+  assert.equal(crossOrigin.statusCode, 403);
+
+  currentConfig = { allowedOrigin: 'https://new.example/app' };
+  const reloadedOrigin = response();
+  routes['OPTIONS /api/miniapp/submit'](request('https://new.example'), reloadedOrigin);
+  assert.equal(reloadedOrigin.statusCode, 204);
+  assert.equal(reloadedOrigin.headers['Access-Control-Allow-Origin'], 'https://new.example');
 });
 
 test('registered submit route forwards a translated request across the live HTTP boundary', async (t) => {
