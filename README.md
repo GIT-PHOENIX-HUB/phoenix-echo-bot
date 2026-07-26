@@ -23,7 +23,7 @@ export ANTHROPIC_AUTH_TOKEN=your-oauth-access-token
 export PHOENIX_WORKSPACE="/absolute/path/to/workspace"
 
 # Optional: protect API/WS with a gateway token
-export PHOENIX_GATEWAY_TOKEN="long-random-token"
+export PHOENIX_GATEWAY_TOKEN="<your-gateway-token>"
 
 # Start the gateway
 npm start
