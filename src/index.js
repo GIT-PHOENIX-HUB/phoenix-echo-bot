@@ -33,6 +33,8 @@ import { TeamsAdapter } from './adapters/teams-adapter.js';
 import { TelegramAdapter } from './adapters/telegram-adapter.js';
 import { CronScheduler, createOvernightIntelJobs } from './cron.js';
 import { registerMiniAppRoutes } from './miniapp-routes.js';
+import { persistTelegramMiniAppFallback } from './miniapp-fallback.js';
+import { hasIndependentAuthentication } from './http-auth.js';
 import { loadRunbookOverview } from './runbooks.js';
 import { getBrainBlueprint, updateBrainChecklistStep } from './brain-blueprint.js';
 
@@ -210,6 +212,7 @@ configureToolRuntime({
 
 // Initialize message router and adapters
 const messageRouter = new MessageRouter();
+const miniAppConfig = config.channels?.miniApp || { enabled: true, allowedOrigin: '' };
 
 // Initialize Teams adapter if configured
 let teamsAdapter = null;
@@ -250,6 +253,10 @@ if (telegramConfig.enabled && telegramConfig.botToken) {
       });
       if (message.reply) await message.reply(response);
       return response;
+    }, {
+      webAppDataHandler: miniAppConfig.enabled
+        ? async (message) => persistTelegramMiniAppFallback(sessionManager, message)
+        : null
     });
     messageRouter.registerAdapter('telegram', telegramAdapter);
     logger.info('Telegram adapter initialized with voice support');
@@ -339,8 +346,10 @@ app.use('/api/chat', chatLimiter);
 const teamsRouteHandler = teamsAdapter ? teamsAdapter.createRouteHandler() : null;
 
 app.use('/api', (req, res, next) => {
-  // Teams webhook authentication is handled by Bot Framework adapter.
-  if (teamsRouteHandler && req.method === 'POST' && req.path === '/messages') {
+  if (hasIndependentAuthentication(req.method, req.path, {
+    teamsRouteEnabled: Boolean(teamsRouteHandler),
+    miniAppSubmitEnabled: miniAppConfig.enabled
+  })) {
     return next();
   }
 
@@ -401,11 +410,21 @@ if (teamsRouteHandler) {
   logger.info('Teams /api/messages endpoint registered');
 }
 
-// Register miniapp routes
-registerMiniAppRoutes(app, {
-  handleMessage,
-  pluginManager: null,
-  persistence: sessionManager, runtime: config.runtime});
+// Register Mini App routes only while the owned channel flag is enabled.
+if (miniAppConfig.enabled) {
+  registerMiniAppRoutes(app, {
+    handleMessage,
+    pluginManager: null,
+    persistence: sessionManager,
+    runtime: config.runtime,
+    miniApp: miniAppConfig
+  });
+  logger.info('Mini App routes enabled', {
+    allowedOrigin: miniAppConfig.allowedOrigin || 'same-origin-only'
+  });
+} else {
+  logger.info('Mini App routes disabled by configuration');
+}
 
 // Cron jobs API
 app.get('/api/cron/jobs', async (req, res) => {

@@ -3,22 +3,39 @@
 ## Purpose + scope (ruling 2/60)
 The integration layer between the Telegram Mini App (`phoenix-electric-miniapp`) and the hub: customer estimates, scheduling requests, questions, app sign-in.
 
-## Current state — LIVE routes + thin adapter
-- `src/miniapp-routes.js` (REAL, wired in `src/index.js`): `POST /api/miniapp/submit` → FORWARDS to runtime `/v1/intake/*` (type map: service-request / size / generator-lead / maintenance; `X-Telegram-Init-Data` passed through; 502/503 on failure so the app's fallback fires) · `POST /api/miniapp/chat` → routes through the bot agent (`handleMessage`) · `products` / `nec` / `quotes` / `job-status` are honest empty stubs.
+## Current state — LIVE submission route + thin adapter
+- `src/miniapp-routes.js` (REAL, gated by `channels.miniApp.enabled` in `src/index.js`):
+  - `POST /api/miniapp/submit` translates the live client types `service_request`, `generator_lead`, and
+    `maintenance_request` to the runtime `/v1/intake/*` models. Missing/unknown types return 400.
+  - It forwards `X-Telegram-Init-Data` for runtime HMAC validation, forwards `X-Request-Id`, and aborts after
+    `runtime.timeoutMs` (502) instead of hanging.
+  - It is narrowly exempt from the private gateway token. The browser never receives that token.
+  - Cross-origin use requires one exact `channels.miniApp.allowedOrigin`; blank means same-origin proxy only.
+  - Telegram `sendData` fallback is consumed by the active adapter and appended durably to
+    `.phoenix-sessions/miniapp-fallback-<chat>.jsonl` for follow-up; it is not falsely reported as a runtime write.
+- `POST /api/miniapp/chat` routes through the bot agent, while `products` / `nec` / `quotes` / `job-status`
+  remain honest empty stubs. Those non-submit routes still use gateway-token auth.
 - `src/channels/mini-app.js` (~40 lines) is a scaffold wrapper — the routes above are the real surface.
 
 ## Config (names only)
-- `runtime.baseUrl` / `runtime.wsUrl` / `runtime.token` (empty slot) — the Phoenix runtime this hub fronts
-- env `PHOENIX_TELEGRAM_MINIAPP_URL`
+- `runtime.baseUrl` / env `PHOENIX_RUNTIME_URL` — runtime intake target
+- `runtime.timeoutMs` / env `PHOENIX_RUNTIME_TIMEOUT_MS` — positive upstream timeout
+- `channels.miniApp.enabled` / env `PHOENIX_MINIAPP_ENABLED`
+- `channels.miniApp.allowedOrigin` / env `PHOENIX_MINIAPP_ALLOWED_ORIGIN`
+- `channels.telegram.miniAppUrl` / env `PHOENIX_TELEGRAM_MINIAPP_URL`
 
 ## Verify
-- `curl -s -X POST localhost:18790/api/miniapp/submit -H 'Content-Type: application/json' -d '{"type":"service-request"}'` → 502 "Backend rejected submission" WITHOUT a valid `X-Telegram-Init-Data` (the runtime enforces the HMAC — a 502 here proves the forward + the auth gate both work).
+- Same-origin operator probe: `curl -s -X POST localhost:18790/api/miniapp/submit -H 'Content-Type: application/json' -d '{"type":"service_request"}'` → 502 "Backend rejected submission" without valid Telegram init data. It must not return a gateway-token 401.
+- Configured cross-origin probe: preflight from the exact allowed origin returns 204 and only that origin is echoed.
 - With the real Mini App (valid initData): 2xx and the runtime's intake response inside `data.runtime`.
+- Stop the runtime: the request returns bounded 502; a Telegram keyboard-button launch can deliver `sendData`,
+  which produces a bot confirmation and a durable fallback session entry.
 
 ## Known next build (gap-map)
 Customer chat UI in the Mini App itself — the bot's `/api/miniapp/chat` endpoint already exists and works; the app has no screen for it yet.
 ## Disable / rollback
-Set the channel's `enabled` flag to `false` in the active config (`config-vps.json` / `config-studio.json`) and restart the bot — a disabled channel logs one "disabled in config" line and touches nothing. Rollback is always config-only; no code changes.
+Set `channels.miniApp.enabled` or `PHOENIX_MINIAPP_ENABLED` to `false` and restart. The bot logs
+`Mini App routes disabled by configuration`; the submit/chat/stub routes are not registered.
 
 ## Escalation
 Channel down or misbehaving → post to the oversight channel (FORMATION/COMMS) with the bot log lines; secrets NEVER in the post. Credential slots live in the vault/env, never in this repo. Outbound to customers is draft-first wherever an approval surface exists — never auto-send beyond the channel's scoped, ruled behavior.

@@ -19,13 +19,18 @@
     "telegram": {
       "enabled": true,
       "botToken": "env:TELEGRAM_BOT_TOKEN",
-      "pollIntervalMs": 300
+      "pollIntervalMs": 300,
+      "miniAppUrl": "env:PHOENIX_TELEGRAM_MINIAPP_URL"
     },
     "whatsapp": {
       "enabled": false
     },
     "teams": {
       "enabled": false
+    },
+    "miniApp": {
+      "enabled": true,
+      "allowedOrigin": "env:PHOENIX_MINIAPP_ALLOWED_ORIGIN"
     }
   },
   "cron": {
@@ -35,7 +40,6 @@
   },
   "runtime": {
     "baseUrl": "http://127.0.0.1:9120",
-    "wsUrl": "ws://127.0.0.1:9120/ws",
-    "token": ""
+    "timeoutMs": 10000
   }
 }

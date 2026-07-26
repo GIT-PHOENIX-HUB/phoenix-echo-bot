@@ -40,7 +40,7 @@ const CIRCUIT_BREAKER_RECOVERY_MS = 60000;
 export class GatewayClient {
   /**
    * @param {Object} options
-   * @param {string} options.url - WebSocket URL — the Phoenix runtime's WS surface (e.g. ws://127.0.0.1:9120/ws, config.runtime.wsUrl)
+   * @param {string} options.url - Phoenix Echo Gateway WebSocket URL (e.g. ws://127.0.0.1:18790/ws)
    * @param {string} [options.token] - Gateway authentication token
    * @param {Function} [options.onMessage] - Message handler
    * @param {Function} [options.onStateChange] - State change callback

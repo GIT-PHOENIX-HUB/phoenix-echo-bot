@@ -15,9 +15,10 @@ Email in/out of the hub (company mailboxes).
 Graph-first (tenant's own app registrations, cert auth — the Mail Courier pattern), not IMAP password auth; subscription webhook for inbound; replies draft-first through the approval surface.
 
 ## Verify (today)
-`channels.outlook.enabled: false` stays false; enabling logs `[Outlook] Channel initialized` and nothing else — that log line is the proof it's a scaffold.
+`src/index.js` has no Outlook import or registration, so changing `channels.outlook.enabled` produces no
+initialization log and no runtime effect.
 ## Disable / rollback
-Set the channel's `enabled` flag to `false` in the active config (`config-vps.json` / `config-studio.json`) and restart the bot — a disabled channel logs one "disabled in config" line and touches nothing. Rollback is always config-only; no code changes.
+No live Outlook surface is registered. Keep the inert config slot false until an owned implementation lands.
 
 ## Escalation
 Channel down or misbehaving → post to the oversight channel (FORMATION/COMMS) with the bot log lines; secrets NEVER in the post. Credential slots live in the vault/env, never in this repo. Outbound to customers is draft-first wherever an approval surface exists — never auto-send beyond the channel's scoped, ruled behavior.

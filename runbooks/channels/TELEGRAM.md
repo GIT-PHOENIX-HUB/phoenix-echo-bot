@@ -4,13 +4,15 @@
 Customer-facing lane: chat with customers, Mini App sign-in, estimates, scheduling, questions. This is the front door for `phoenix-electric-miniapp` (the Mini App launches from this bot and posts back through it).
 
 ## Current state — REAL adapter
-`src/channels/telegram.js` (~184 lines): Telegram Bot API via long polling. Mini App submissions arrive over `/api/miniapp/submit` and are FORWARDED to the Phoenix runtime `/v1/intake/*` (type-mapped, `X-Telegram-Init-Data` passed through for the runtime's HMAC check) — see `src/miniapp-routes.js`.
+`src/adapters/telegram-adapter.js` is instantiated by `src/index.js` and uses Telegram Bot API long polling.
+It handles text/voice, registered slash commands that open `channels.telegram.miniAppUrl`, and
+`web_app_data` fallback persistence. The orphaned `src/channels/telegram.js` is not the running adapter.
 
 ## Config (names only — values live in env/vault)
 - `channels.telegram.enabled` (default false)
 - `channels.telegram.botToken` ← env `PHOENIX_TELEGRAM_BOT_TOKEN`
 - `channels.telegram.pollIntervalMs` (default 300)
-- env `PHOENIX_TELEGRAM_MINIAPP_URL` — the Mini App URL the bot serves to users
+- `channels.telegram.miniAppUrl` ← env `PHOENIX_TELEGRAM_MINIAPP_URL` — Web App buttons for the registered commands
 - `runtime.baseUrl` — the Phoenix runtime the intake forward targets (`http://127.0.0.1:9120`)
 
 ## Enable
@@ -20,10 +22,11 @@ Customer-facing lane: chat with customers, Mini App sign-in, estimates, scheduli
 
 ## Verify
 - Send the bot a DM → agent replies on the Telegram channel.
-- Launch the Mini App → submit a service request → bot log shows `MiniApp submission received` then the runtime forward; runtime answers 2xx (or the bot returns 502 and the Mini App falls back to `tg.sendData` — that fallback firing IS the honest failure mode, investigate the runtime).
-- `curl -s localhost:18790/healthz` (bot up) and `curl -s localhost:9120/healthz` (runtime up).
+- Launch the Mini App → submit a service request → bot log shows `MiniApp submission received` then the runtime forward. On a 502/network failure, a keyboard-button launch can deliver `tg.sendData`; the active adapter confirms receipt only after appending the normalized request to its durable fallback session.
+- `curl -s localhost:18790/health` (bot up) and `curl -s localhost:9120/healthz` (runtime up).
 ## Disable / rollback
-Set the channel's `enabled` flag to `false` in the active config (`config-vps.json` / `config-studio.json`) and restart the bot — a disabled channel logs one "disabled in config" line and touches nothing. Rollback is always config-only; no code changes.
+Set `channels.telegram.enabled` to `false` and restart to stop polling. Mini App HTTP routes have their own
+`channels.miniApp.enabled` gate and must be disabled separately when that surface also needs rollback.
 
 ## Escalation
 Channel down or misbehaving → post to the oversight channel (FORMATION/COMMS) with the bot log lines; secrets NEVER in the post. Credential slots live in the vault/env, never in this repo. Outbound to customers is draft-first wherever an approval surface exists — never auto-send beyond the channel's scoped, ruled behavior.
