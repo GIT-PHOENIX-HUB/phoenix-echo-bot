@@ -66,7 +66,8 @@ So no client app needs a rebuild or redeploy for this rotation.
 
 ## Rollback
 Re-set the previous value on the affected host(s) and restart. Rotation is reversible until the old value is
-deleted from the vault — delete it only after every host verifies green on the new one.
+disabled in Azure Key Vault. Disable only the previous secret **version** after every host verifies green on
+the new one. Do not delete the shared secret name: that removes every version, including the active value.
 
 ## Escalation
 A host that will not accept the new token: post the bot's startup log lines to the oversight channel

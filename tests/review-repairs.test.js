@@ -353,6 +353,12 @@ test('blank Mini App allowlist permits only the request same-origin and reloads 
   routes['OPTIONS /api/miniapp/submit'](request('https://new.example'), reloadedOrigin);
   assert.equal(reloadedOrigin.statusCode, 204);
   assert.equal(reloadedOrigin.headers['Access-Control-Allow-Origin'], 'https://new.example');
+
+  currentConfig = { allowedOrigin: 'not-a-url' };
+  const invalidOrigin = response();
+  routes['OPTIONS /api/miniapp/submit'](request('https://new.example'), invalidOrigin);
+  assert.equal(invalidOrigin.statusCode, 503);
+  assert.match(invalidOrigin.body.error, /configuration is invalid/);
 });
 
 test('registered submit route forwards a translated request across the live HTTP boundary', async (t) => {
@@ -486,6 +492,8 @@ test('channel runbooks describe only active registrations and exact rollback pat
   assert.match(overview, /Mini App HTTP routes/);
   assert.match(token, /authorized operator/);
   assert.match(token, /api\/channels\/status/);
+  assert.match(token, /Disable only the previous secret \*\*version\*\*/);
+  assert.match(token, /Do not delete the shared secret name/);
   assert.doesNotMatch(token, /api\/miniapp\/products/);
   assert.doesNotMatch(token, /Any seat/);
 });

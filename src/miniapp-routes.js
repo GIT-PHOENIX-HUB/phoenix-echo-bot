@@ -227,9 +227,25 @@ export function registerMiniAppRoutes(app, deps = {}) {
     const current = typeof miniApp === 'function' ? miniApp() : miniApp;
     return configuredMiniAppOrigin(current?.allowedOrigin);
   };
+  const applyCurrentSubmissionCors = (req, res) => {
+    try {
+      return applySubmissionCors(req, res, currentAllowedOrigin());
+    } catch (error) {
+      logger.error('MiniApp CORS configuration invalid', {
+        error: error.message,
+        requestId: req.requestId
+      });
+      res.status(503).json({
+        success: false,
+        error: 'Mini App origin configuration is invalid',
+        requestId: req.requestId
+      });
+      return false;
+    }
+  };
 
   app.options('/api/miniapp/submit', (req, res) => {
-    if (!applySubmissionCors(req, res, currentAllowedOrigin())) return;
+    if (!applyCurrentSubmissionCors(req, res)) return;
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
@@ -239,7 +255,7 @@ export function registerMiniAppRoutes(app, deps = {}) {
   });
 
   app.post('/api/miniapp/submit', async (req, res) => {
-    if (!applySubmissionCors(req, res, currentAllowedOrigin())) return;
+    if (!applyCurrentSubmissionCors(req, res)) return;
     try {
       const data = req.body;
       logger.info('MiniApp submission received', {
