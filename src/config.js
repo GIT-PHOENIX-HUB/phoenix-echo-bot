@@ -77,7 +77,18 @@ function isObject(value) {
 }
 
 function deepMerge(base, override) {
-  const output = { ...base };
+  const output = {};
+  for (const [key, value] of Object.entries(base || {})) {
+    if (isObject(value)) {
+      output[key] = deepMerge(value, {});
+    } else if (Array.isArray(value)) {
+      output[key] = value.map((item) => (
+        isObject(item) ? deepMerge(item, {}) : item
+      ));
+    } else {
+      output[key] = value;
+    }
+  }
   for (const [key, value] of Object.entries(override || {})) {
     if (isObject(value) && isObject(output[key])) {
       output[key] = deepMerge(output[key], value);
@@ -293,7 +304,7 @@ export async function loadConfig(options = {}) {
   config.channels.teams.serviceUrl = resolveEnvRef(config.channels.teams.serviceUrl || '');
   config.channels.miniApp.enabled = config.channels.miniApp.enabled !== false;
   config.channels.miniApp.allowedOrigin = resolveEnvRef(
-    config.channels.miniApp.allowedOrigin || config.channels.telegram.miniAppUrl || ''
+    config.channels.miniApp.allowedOrigin || ''
   );
 
   const cronConfig = config?.cron && typeof config.cron === 'object' ? config.cron : {};

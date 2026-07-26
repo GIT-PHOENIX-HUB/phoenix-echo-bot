@@ -22,3 +22,7 @@ export function hasIndependentAuthentication(
 
   return false;
 }
+
+export function enabledMiniAppLaunchUrl(enabled, value) {
+  return enabled ? String(value || '').trim() : '';
+}

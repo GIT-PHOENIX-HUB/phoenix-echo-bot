@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { test } from 'node:test';
 import express from 'express';
 
-import { hasIndependentAuthentication } from '../src/http-auth.js';
+import { enabledMiniAppLaunchUrl, hasIndependentAuthentication } from '../src/http-auth.js';
 import { loadConfig } from '../src/config.js';
 import { persistTelegramMiniAppFallback } from '../src/miniapp-fallback.js';
 import {
@@ -55,12 +55,30 @@ test('advertised runtime and Mini App environment settings reach loaded config',
     assert.equal(config.channels.telegram.miniAppUrl, 'https://miniapp.example/app');
     assert.equal(config.channels.miniApp.enabled, true);
     assert.equal(config.channels.miniApp.allowedOrigin, 'https://miniapp.example');
+
+    delete process.env.PHOENIX_MINIAPP_ALLOWED_ORIGIN;
+    const { config: launchOnly } = await loadConfig({
+      projectRoot: '/tmp/phoenix-echo-review'
+    });
+    assert.equal(launchOnly.channels.telegram.miniAppUrl, 'https://miniapp.example/app');
+    assert.equal(launchOnly.channels.miniApp.allowedOrigin, '');
   } finally {
     for (const key of keys) {
       if (before[key] == null) delete process.env[key];
       else process.env[key] = before[key];
     }
   }
+});
+
+test('Mini App disable gate removes the Telegram launch URL', () => {
+  assert.equal(
+    enabledMiniAppLaunchUrl(false, 'https://miniapp.example/app'),
+    ''
+  );
+  assert.equal(
+    enabledMiniAppLaunchUrl(true, ' https://miniapp.example/app '),
+    'https://miniapp.example/app'
+  );
 });
 
 test('live Mini App types and fields translate to exact runtime intake contracts', () => {
@@ -102,6 +120,14 @@ test('live Mini App types and fields translate to exact runtime intake contracts
     name: 'B',
     phone: '2'
   });
+  assert.throws(
+    () => normalizeMiniAppSubmission({ type: 'generator_lead' }),
+    /Unsupported generator coverage/
+  );
+  assert.throws(
+    () => normalizeMiniAppSubmission({ type: 'generator_lead', coverage: 'typo' }),
+    /Unsupported generator coverage/
+  );
 
   const maintenance = normalizeMiniAppSubmission({
     type: 'maintenance_request',
@@ -355,15 +381,20 @@ test('registered submit route forwards a translated request across the live HTTP
     next();
   });
   app.use(express.json());
+  let runtimeConfig = {
+    baseUrl: 'http://127.0.0.1:1',
+    timeoutMs: 1
+  };
   registerMiniAppRoutes(app, {
-    runtime: {
-      baseUrl: `http://127.0.0.1:${runtimePort}`,
-      timeoutMs: 500
-    },
+    runtime: () => runtimeConfig,
     miniApp: {
       allowedOrigin: 'https://miniapp.example/app'
     }
   });
+  runtimeConfig = {
+    baseUrl: `http://127.0.0.1:${runtimePort}`,
+    timeoutMs: 500
+  };
   const gatewayServer = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => gatewayServer.once('listening', resolve));
   t.after(() => new Promise((resolve) => gatewayServer.close(resolve)));

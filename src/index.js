@@ -34,7 +34,7 @@ import { TelegramAdapter } from './adapters/telegram-adapter.js';
 import { CronScheduler, createOvernightIntelJobs } from './cron.js';
 import { registerMiniAppRoutes } from './miniapp-routes.js';
 import { persistTelegramMiniAppFallback } from './miniapp-fallback.js';
-import { hasIndependentAuthentication } from './http-auth.js';
+import { enabledMiniAppLaunchUrl, hasIndependentAuthentication } from './http-auth.js';
 import { loadRunbookOverview } from './runbooks.js';
 import { getBrainBlueprint, updateBrainChecklistStep } from './brain-blueprint.js';
 
@@ -245,6 +245,10 @@ if (telegramConfig.enabled && telegramConfig.botToken) {
   try {
     const telegramAdapter = new TelegramAdapter({
       ...telegramConfig,
+      miniAppUrl: enabledMiniAppLaunchUrl(
+        miniAppConfig.enabled,
+        telegramConfig.miniAppUrl
+      ),
       whisperApiKey: process.env.OPENAI_API_KEY || telegramConfig.whisperApiKey,
       whisperModel: telegramConfig.whisperModel || 'whisper-1'
     }, async (message) => {
@@ -417,7 +421,7 @@ if (miniAppConfig.enabled) {
     handleMessage,
     pluginManager: null,
     persistence: sessionManager,
-    runtime: config.runtime,
+    runtime: () => config.runtime,
     miniApp: () => config.channels?.miniApp || miniAppConfig
   });
   logger.info('Mini App routes enabled', {

@@ -16,16 +16,20 @@ function commandName(text) {
 
 function commandPayload(command, firstName, miniAppUrl) {
   const name = firstName || 'there';
-  const keyboard = (label, startApp) => ({
-    reply_markup: {
-      keyboard: [[{
-        text: label,
-        web_app: { url: `${miniAppUrl}?startapp=${startApp}` }
-      }]],
-      resize_keyboard: true,
-      one_time_keyboard: true
-    }
-  });
+  const keyboard = (label, startApp) => {
+    const url = new URL(miniAppUrl);
+    url.searchParams.set('startapp', startApp);
+    return {
+      reply_markup: {
+        keyboard: [[{
+          text: label,
+          web_app: { url: url.toString() }
+        }]],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      }
+    };
+  };
   const unavailable = {
     text: 'The Phoenix Electric Mini App is temporarily unavailable. Please try again later.',
     options: {}

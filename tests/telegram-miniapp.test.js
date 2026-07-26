@@ -64,6 +64,25 @@ test('Telegram slash commands open the configured Mini App URL', async () => {
   );
 });
 
+test('Telegram launcher preserves existing URL query and fragment components', async () => {
+  const bot = new FakeBot();
+  new TelegramAdapter({
+    botToken: 'test',
+    miniAppUrl: 'https://miniapp.example/app?v=2#form'
+  }, async () => '', { bot });
+
+  await bot.handlers.get('message')({
+    chat: { id: 123 },
+    from: { id: 456, first_name: 'Customer' },
+    text: '/service'
+  });
+
+  assert.equal(
+    bot.sent[0].options.reply_markup.keyboard[0][0].web_app.url,
+    'https://miniapp.example/app?v=2&startapp=service#form'
+  );
+});
+
 test('Telegram reply-keyboard launch can deliver web_app_data fallback', async () => {
   const bot = new FakeBot();
   new TelegramAdapter({

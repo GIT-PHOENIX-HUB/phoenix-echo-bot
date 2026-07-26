@@ -23,14 +23,18 @@ function normalizedType(value) {
 
 function generatorCoverage(value) {
   const key = String(value || '').trim().toLowerCase();
-  return {
+  const coverage = {
     essential: 'essentials',
     essentials: 'essentials',
     managed: 'managed_whole_home',
     managed_whole_home: 'managed_whole_home',
     full: 'full_whole_home',
     full_whole_home: 'full_whole_home'
-  }[key] || 'managed_whole_home';
+  }[key];
+  if (!coverage) {
+    throw new Error(`Unsupported generator coverage: ${key || '(missing)'}`);
+  }
+  return coverage;
 }
 
 export function normalizeMiniAppSubmission(data) {
@@ -216,6 +220,9 @@ export function registerMiniAppRoutes(app, deps = {}) {
     runtime,
     miniApp = {}
   } = deps;
+  const currentRuntime = () => (
+    typeof runtime === 'function' ? runtime() : runtime
+  );
   const currentAllowedOrigin = () => {
     const current = typeof miniApp === 'function' ? miniApp() : miniApp;
     return configuredMiniAppOrigin(current?.allowedOrigin);
@@ -243,7 +250,7 @@ export function registerMiniAppRoutes(app, deps = {}) {
       let forwarded;
       try {
         forwarded = await forwardMiniAppSubmission(data, {
-          runtime,
+          runtime: currentRuntime(),
           initData: req.get('X-Telegram-Init-Data') || '',
           requestId: req.requestId
         });
