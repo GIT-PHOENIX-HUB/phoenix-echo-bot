@@ -115,7 +115,7 @@ test('live Mini App types and fields translate to exact runtime intake contracts
   assert.equal(maintenance.body.model, 'Guardian');
 
   assert.throws(() => normalizeMiniAppSubmission({ type: 'unknown' }), /Unsupported/);
-  assert.throws(() => normalizeMiniAppSubmission({ type: 'quote_request' }), /quotes/);
+  assert.throws(() => normalizeMiniAppSubmission({ type: 'quote_request' }), /not supported/);
 });
 
 test('unsupported submit types are classified as client errors before backend access', async () => {
@@ -374,5 +374,7 @@ test('channel runbooks describe only active registrations and exact rollback pat
   assert.match(whatsapp, /UNWIRED SCAFFOLD/);
   assert.match(overview, /Mini App HTTP routes/);
   assert.match(token, /authorized operator/);
+  assert.match(token, /api\/channels\/status/);
+  assert.doesNotMatch(token, /api\/miniapp\/products/);
   assert.doesNotMatch(token, /Any seat/);
 });

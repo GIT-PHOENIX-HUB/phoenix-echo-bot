@@ -91,7 +91,7 @@ export function normalizeMiniAppSubmission(data) {
   }
 
   if (type === 'quote_request') {
-    throw new Error('quote_request is not accepted by submit; use /api/miniapp/quotes');
+    throw new Error('quote_request submissions are not supported');
   }
   throw new Error(`Unsupported Mini App submission type: ${type || '(missing)'}`);
 }

@@ -18,12 +18,18 @@ function commandPayload(command, firstName, miniAppUrl) {
   const name = firstName || 'there';
   const keyboard = (label, startApp) => ({
     reply_markup: {
-      inline_keyboard: [[{
+      keyboard: [[{
         text: label,
         web_app: { url: `${miniAppUrl}?startapp=${startApp}` }
-      }]]
+      }]],
+      resize_keyboard: true,
+      one_time_keyboard: true
     }
   });
+  const unavailable = {
+    text: 'The Phoenix Electric Mini App is temporarily unavailable. Please try again later.',
+    options: {}
+  };
 
   if (command === '/terms') {
     return {
@@ -32,18 +38,21 @@ function commandPayload(command, firstName, miniAppUrl) {
     };
   }
   if (command === '/generator' || command === '/generac') {
+    if (!miniAppUrl) return unavailable;
     return {
       text: `Hi ${name}. Open the Generac sizing tool below.`,
       options: keyboard('Size My Generator', 'generator')
     };
   }
   if (command === '/maintenance' || command === '/maint') {
+    if (!miniAppUrl) return unavailable;
     return {
       text: `Hi ${name}. Open the generator maintenance request below.`,
       options: keyboard('Book Maintenance', 'maintenance')
     };
   }
   if (command === '/service') {
+    if (!miniAppUrl) return unavailable;
     return {
       text: `Hi ${name}. Open a Phoenix Electric service request below.`,
       options: keyboard('Request Service', 'service')
@@ -55,6 +64,7 @@ function commandPayload(command, firstName, miniAppUrl) {
       options: {}
     };
   }
+  if (!miniAppUrl) return unavailable;
   return {
     text: `Welcome to Phoenix Electric, ${name}. Choose a service below.`,
     options: keyboard('Open Phoenix Electric', 'service')

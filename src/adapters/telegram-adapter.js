@@ -41,18 +41,14 @@ export class TelegramAdapter {
           return;
         }
         if (msg.text?.startsWith('/')) {
-          if (!String(this.config.miniAppUrl || '').trim()) {
-            logger.warn('Telegram Mini App command rejected: miniAppUrl is not configured', {
-              chatId: msg?.chat?.id ?? null
-            });
-            await this.bot.sendMessage(
-              msg.chat.id,
-              'The Phoenix Electric Mini App is temporarily unavailable. Please try again later.'
-            );
+          const handled = await handleTelegramCommand(
+            this.bot,
+            msg,
+            String(this.config.miniAppUrl || '').trim()
+          );
+          if (handled) {
             return;
           }
-          await handleTelegramCommand(this.bot, msg, this.config.miniAppUrl);
-          return;
         }
         if (msg.voice || msg.audio) {
           await this._handleVoiceMessage(msg, msg.audio ? 'audio' : 'voice');

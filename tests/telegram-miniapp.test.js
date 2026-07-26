@@ -59,7 +59,54 @@ test('Telegram slash commands open the configured Mini App URL', async () => {
 
   assert.equal(bot.sent.length, 1);
   assert.equal(
-    bot.sent[0].options.reply_markup.inline_keyboard[0][0].web_app.url,
+    bot.sent[0].options.reply_markup.keyboard[0][0].web_app.url,
     'https://miniapp.example/app?startapp=service'
   );
+});
+
+test('Telegram reply-keyboard launch can deliver web_app_data fallback', async () => {
+  const bot = new FakeBot();
+  new TelegramAdapter({
+    botToken: 'test',
+    miniAppUrl: 'https://miniapp.example/app'
+  }, async () => '', { bot });
+
+  await bot.handlers.get('message')({
+    chat: { id: 123 },
+    from: { id: 456, first_name: 'Customer' },
+    text: '/generator'
+  });
+
+  const markup = bot.sent[0].options.reply_markup;
+  assert.equal(markup.inline_keyboard, undefined);
+  assert.equal(markup.keyboard[0][0].web_app.url, 'https://miniapp.example/app?startapp=generator');
+  assert.equal(markup.one_time_keyboard, true);
+});
+
+test('text-only Telegram commands work without a Mini App URL', async () => {
+  const bot = new FakeBot();
+  new TelegramAdapter({
+    botToken: 'test',
+    miniAppUrl: ''
+  }, async () => '', { bot });
+
+  await bot.handlers.get('message')({
+    chat: { id: 123 },
+    from: { id: 456, first_name: 'Customer' },
+    text: '/help'
+  });
+  await bot.handlers.get('message')({
+    chat: { id: 123 },
+    from: { id: 456, first_name: 'Customer' },
+    text: '/terms'
+  });
+  await bot.handlers.get('message')({
+    chat: { id: 123 },
+    from: { id: 456, first_name: 'Customer' },
+    text: '/service'
+  });
+
+  assert.match(bot.sent[0].text, /Commands:/);
+  assert.match(bot.sent[1].text, /estimates/i);
+  assert.match(bot.sent[2].text, /temporarily unavailable/i);
 });

@@ -47,11 +47,11 @@ host environment is the source of truth at runtime.
 ## Verify — old rejected, new accepted
 ```bash
 # OLD value must now FAIL
-curl -s -o /dev/null -w '%{http_code}\n' -H "x-phoenix-token: $OLD" http://127.0.0.1:18790/api/miniapp/products
+curl -s -o /dev/null -w '%{http_code}\n' -H "x-phoenix-token: $OLD" http://127.0.0.1:18790/api/channels/status
 # expect 401
 
 # NEW value must SUCCEED
-curl -s -o /dev/null -w '%{http_code}\n' -H "x-phoenix-token: $NEW" http://127.0.0.1:18790/api/miniapp/products
+curl -s -o /dev/null -w '%{http_code}\n' -H "x-phoenix-token: $NEW" http://127.0.0.1:18790/api/channels/status
 # expect 200
 ```
 Both checks must pass **on every host** before the rotation is called done. A 200 on the old value means the
