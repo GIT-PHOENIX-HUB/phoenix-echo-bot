@@ -5,6 +5,7 @@
  * Replaces the old channels-integration.js ChannelsManager.
  */
 
+import { randomUUID } from 'crypto';
 import { getDefaultLogger } from './logger.js';
 
 const logger = getDefaultLogger();
@@ -12,6 +13,8 @@ const logger = getDefaultLogger();
 export class MessageRouter {
   constructor() {
     this.adapters = new Map();
+    this.handleMessage = null;
+    this.pluginRouter = null;
   }
 
   registerAdapter(name, adapter) {
@@ -27,6 +30,56 @@ export class MessageRouter {
     return await adapter.sendMessage(target, message);
   }
 
+  normalize(platform, raw = {}) {
+    const adapter = this.adapters.get(platform);
+    if (typeof adapter?.normalizeInbound === 'function') {
+      return adapter.normalizeInbound(raw);
+    }
+    return {
+      id: raw.id || randomUUID(),
+      platform,
+      channelId: String(raw.channelId || ''),
+      userId: String(raw.userId || ''),
+      userName: String(raw.userName || ''),
+      text: String(raw.text || ''),
+      attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+      metadata: raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {},
+      timestamp: raw.timestamp || new Date().toISOString()
+    };
+  }
+
+  formatOutbound(text, platform) {
+    const adapter = this.adapters.get(platform);
+    if (typeof adapter?.formatResponse === 'function') {
+      return adapter.formatResponse(text);
+    }
+    return text;
+  }
+
+  async routeInbound(message, context = {}) {
+    try {
+      if (typeof this.pluginRouter === 'function') {
+        const pluginResponse = await this.pluginRouter(message, context);
+        if (pluginResponse != null) {
+          return pluginResponse;
+        }
+      }
+      if (typeof this.handleMessage !== 'function') {
+        throw new Error('No inbound message handler configured');
+      }
+      const sessionId = `${message.platform}-${message.channelId}`;
+      return await this.handleMessage(sessionId, message.text, {
+        ...context,
+        source: message.platform,
+        userId: message.userId,
+        userName: message.userName
+      });
+    } catch (error) {
+      logger.error('Inbound message routing failed', { error: error.message });
+      return 'Sorry, an error occurred while routing your message.';
+    }
+  }
+
   getStatus() {
     const channels = {};
     for (const [name, adapter] of this.adapters) {
@@ -35,7 +88,7 @@ export class MessageRouter {
         ready: typeof adapter.isReady === 'function' ? adapter.isReady() : true
       };
     }
-    return { channels };
+    return channels;
   }
 
   async cleanup() {

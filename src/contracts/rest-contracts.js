@@ -34,7 +34,8 @@ export const ERROR_CODES = {
 // ── Auth Methods by Surface ──
 export const AUTH_METHODS = {
   COMMAND_APP:       'MSAL bearer token (Azure AD)',
-  MINI_APP:          'Telegram initData validation (X-Telegram-Init-Data header)',
+  MINI_APP_SUBMIT:   'Telegram initData validation (X-Telegram-Init-Data header)',
+  MINI_APP_INTERNAL: 'Gateway token/bearer; not a public browser surface',
   GATEWAY_INTERNAL:  'Token/bearer (X-Phoenix-Token header)'
 };
 
@@ -52,12 +53,12 @@ export const ENDPOINTS = {
   'GET /health':                   'Health check (no auth)',
   'POST /api/messages':            'Teams Bot Framework (adapter auth)',
   // MiniApp
-  'POST /api/miniapp/submit':      'MiniApp submission (MINI_APP)',
-  'POST /api/miniapp/chat':        'MiniApp chat (MINI_APP)',
-  'GET /api/miniapp/products':     'Product catalog (MINI_APP)',
-  'GET /api/miniapp/nec':          'NEC code lookup (MINI_APP)',
-  'POST /api/miniapp/quotes':      'Quote request (MINI_APP)',
-  'GET /api/miniapp/job-status':   'Job status (MINI_APP)',
+  'POST /api/miniapp/submit':      'MiniApp submission (MINI_APP_SUBMIT)',
+  'POST /api/miniapp/chat':        'MiniApp chat (MINI_APP_INTERNAL)',
+  'GET /api/miniapp/products':     'Product catalog (MINI_APP_INTERNAL)',
+  'GET /api/miniapp/nec':          'NEC code lookup (MINI_APP_INTERNAL)',
+  'POST /api/miniapp/quotes':      'Quote request (MINI_APP_INTERNAL)',
+  'GET /api/miniapp/job-status':   'Job status (MINI_APP_INTERNAL)',
   // Command App -> Azure Functions
   'POST /api/timeclock':           'Clock in/out (COMMAND_APP)',
   'POST /api/dailylog':            'Daily work log (COMMAND_APP)',

@@ -60,7 +60,7 @@ npm install
 
 3. Export required secrets (shell, launchd, or vault-injected env):
 ```bash
-export PHOENIX_GATEWAY_TOKEN='...'
+export PHOENIX_GATEWAY_TOKEN="<your-gateway-token>"
 export PHOENIX_TELEGRAM_BOT_TOKEN='...'
 export PHOENIX_TEAMS_APP_ID='...'
 export PHOENIX_TEAMS_APP_PASSWORD='...'

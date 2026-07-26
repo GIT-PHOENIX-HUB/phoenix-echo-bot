@@ -7,13 +7,15 @@
 
 import TelegramBot from 'node-telegram-bot-api';
 import { getDefaultLogger } from '../logger.js';
+import { handleTelegramCommand } from './telegram-commands.js';
 
 const logger = getDefaultLogger();
 
 export class TelegramAdapter {
-  constructor(config, messageHandler) {
+  constructor(config, messageHandler, options = {}) {
     this.config = config;
     this.messageHandler = messageHandler;
+    this.webAppDataHandler = options.webAppDataHandler || null;
     this.bot = null;
     this.ready = false;
 
@@ -22,7 +24,10 @@ export class TelegramAdapter {
       return;
     }
 
-    this.bot = new TelegramBot(config.botToken, { polling: true, request: { timeout: 30000 } });
+    this.bot = options.bot || new TelegramBot(config.botToken, {
+      polling: true,
+      request: { timeout: 30000 }
+    });
     this._setupHandlers();
     this.ready = true;
     logger.info('TelegramAdapter initialized', { polling: true });
@@ -31,11 +36,25 @@ export class TelegramAdapter {
   _setupHandlers() {
     this.bot.on('message', async (msg) => {
       try {
+        if (msg.web_app_data) {
+          await this._handleWebAppData(msg);
+          return;
+        }
+        if (msg.text?.startsWith('/')) {
+          const handled = await handleTelegramCommand(
+            this.bot,
+            msg,
+            String(this.config.miniAppUrl || '').trim()
+          );
+          if (handled) {
+            return;
+          }
+        }
         if (msg.voice || msg.audio) {
           await this._handleVoiceMessage(msg, msg.audio ? 'audio' : 'voice');
           return;
         }
-        if (msg.text && !msg.text.startsWith('/')) {
+        if (msg.text) {
           await this._handleTextMessage(msg);
         }
       } catch (error) {
@@ -49,6 +68,28 @@ export class TelegramAdapter {
     this.bot.on('polling_error', (error) => {
       logger.error('Telegram polling error', { error: error.message });
     });
+  }
+
+  async _handleWebAppData(msg) {
+    if (!this.webAppDataHandler) {
+      throw new Error('Telegram Mini App fallback handler is unavailable');
+    }
+
+    const result = await this.webAppDataHandler({
+      data: msg.web_app_data.data,
+      chatId: String(msg.chat.id),
+      userId: String(msg.from?.id || ''),
+      fromName: msg.from?.first_name || 'Unknown'
+    });
+    logger.info('Telegram Mini App fallback persisted', {
+      chatId: msg.chat.id,
+      type: result?.type || 'unknown',
+      sessionId: result?.sessionId || null
+    });
+    await this.bot.sendMessage(
+      msg.chat.id,
+      'We received your request for follow-up. Phoenix Electric will contact you shortly.'
+    );
   }
 
   async _handleTextMessage(msg) {

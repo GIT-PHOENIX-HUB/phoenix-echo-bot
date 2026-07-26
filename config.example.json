@@ -29,7 +29,8 @@
     "telegram": {
       "enabled": false,
       "botToken": "env:PHOENIX_TELEGRAM_BOT_TOKEN",
-      "pollIntervalMs": 300
+      "pollIntervalMs": 300,
+      "miniAppUrl": "env:PHOENIX_TELEGRAM_MINIAPP_URL"
     },
     "teams": {
       "enabled": false,
@@ -37,10 +38,18 @@
       "appPassword": "env:PHOENIX_TEAMS_APP_PASSWORD",
       "appTenantId": "env:PHOENIX_TEAMS_APP_TENANT_ID",
       "serviceUrl": "env:PHOENIX_TEAMS_SERVICE_URL"
+    },
+    "miniApp": {
+      "enabled": false,
+      "allowedOrigin": "env:PHOENIX_MINIAPP_ALLOWED_ORIGIN"
     }
   },
   "cron": {
     "enableOvernightIntel": true,
     "timezone": "America/Denver"
+  },
+  "runtime": {
+    "baseUrl": "http://127.0.0.1:9120",
+    "timeoutMs": 10000
   }
 }

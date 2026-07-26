@@ -61,14 +61,14 @@
 
 /**
  * @typedef {Object} MiniAppSubmission
- * @property {string} type - Submission type (service_request|generator_lead|maintenance_booking|quote_request)
+ * @property {string} type - Submission type (service_request|generator_lead|maintenance_request)
  * @property {string} name - Customer name
  * @property {string} phone - Customer phone
  * @property {string} email - Customer email
  * @property {string} address - Service address
  * @property {string} description - Description of work needed
  * @property {string} [preferredDate] - Preferred service date
- * @property {string} [urgency] - Urgency level (routine|urgent|emergency)
+ * @property {string} [urgency] - Urgency level (emergency|this_week|flexible)
  * @property {Object} [metadata] - Extra submission data
  */
 

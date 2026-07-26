@@ -13,6 +13,10 @@ const DEFAULT_CONFIG = {
     }
   },
   workspace: '',
+  runtime: {
+    baseUrl: 'http://127.0.0.1:9120',
+    timeoutMs: 10000
+  },
   agent: {
     model: 'claude-sonnet-4-5-20250929',
     maxIterations: 25,
@@ -31,7 +35,8 @@ const DEFAULT_CONFIG = {
     telegram: {
       enabled: false,
       botToken: '',
-      pollIntervalMs: 300
+      pollIntervalMs: 300,
+      miniAppUrl: ''
     },
     teams: {
       enabled: false,
@@ -39,6 +44,10 @@ const DEFAULT_CONFIG = {
       appPassword: '',
       appTenantId: '',
       serviceUrl: ''
+    },
+    miniApp: {
+      enabled: false,
+      allowedOrigin: ''
     }
   },
   cron: {
@@ -68,7 +77,18 @@ function isObject(value) {
 }
 
 function deepMerge(base, override) {
-  const output = { ...base };
+  const output = {};
+  for (const [key, value] of Object.entries(base || {})) {
+    if (isObject(value)) {
+      output[key] = deepMerge(value, {});
+    } else if (Array.isArray(value)) {
+      output[key] = value.map((item) => (
+        isObject(item) ? deepMerge(item, {}) : item
+      ));
+    } else {
+      output[key] = value;
+    }
+  }
   for (const [key, value] of Object.entries(override || {})) {
     if (isObject(value) && isObject(output[key])) {
       output[key] = deepMerge(output[key], value);
@@ -181,6 +201,12 @@ export async function loadConfig(options = {}) {
   if (process.env.PHOENIX_WORKSPACE) {
     config.workspace = process.env.PHOENIX_WORKSPACE;
   }
+  if (process.env.PHOENIX_RUNTIME_URL) {
+    config.runtime.baseUrl = process.env.PHOENIX_RUNTIME_URL;
+  }
+  if (process.env.PHOENIX_RUNTIME_TIMEOUT_MS) {
+    config.runtime.timeoutMs = Number(process.env.PHOENIX_RUNTIME_TIMEOUT_MS);
+  }
   if (process.env.PHOENIX_MODEL) {
     config.agent.model = process.env.PHOENIX_MODEL;
   }
@@ -201,6 +227,15 @@ export async function loadConfig(options = {}) {
   }
   if (process.env.PHOENIX_TELEGRAM_POLL_INTERVAL_MS) {
     config.channels.telegram.pollIntervalMs = Number(process.env.PHOENIX_TELEGRAM_POLL_INTERVAL_MS);
+  }
+  if (process.env.PHOENIX_TELEGRAM_MINIAPP_URL) {
+    config.channels.telegram.miniAppUrl = process.env.PHOENIX_TELEGRAM_MINIAPP_URL;
+  }
+  if (process.env.PHOENIX_MINIAPP_ENABLED) {
+    config.channels.miniApp.enabled = process.env.PHOENIX_MINIAPP_ENABLED === 'true';
+  }
+  if (process.env.PHOENIX_MINIAPP_ALLOWED_ORIGIN) {
+    config.channels.miniApp.allowedOrigin = process.env.PHOENIX_MINIAPP_ALLOWED_ORIGIN;
   }
   if (process.env.PHOENIX_TEAMS_ENABLED) {
     config.channels.teams.enabled = process.env.PHOENIX_TEAMS_ENABLED === 'true';
@@ -228,6 +263,12 @@ export async function loadConfig(options = {}) {
   config.logging.file = expandHome(config.logging.file || '');
   config.gateway.auth.mode = String(config.gateway.auth.mode || 'token').toLowerCase();
   config.gateway.auth.token = resolveGatewayToken(config);
+  config.runtime.baseUrl = String(resolveEnvRef(config.runtime.baseUrl || '')).replace(/\/+$/, '');
+  const runtimeTimeoutMs = Number(config.runtime.timeoutMs);
+  if (!Number.isFinite(runtimeTimeoutMs) || runtimeTimeoutMs <= 0) {
+    throw new Error(`Invalid runtime timeout: ${config.runtime.timeoutMs}`);
+  }
+  config.runtime.timeoutMs = Math.floor(runtimeTimeoutMs);
 
   if (!isObject(config.channels)) {
     config.channels = {};
@@ -241,12 +282,16 @@ export async function loadConfig(options = {}) {
   if (!isObject(config.channels.teams)) {
     config.channels.teams = { ...DEFAULT_CONFIG.channels.teams };
   }
+  if (!isObject(config.channels.miniApp)) {
+    config.channels.miniApp = { ...DEFAULT_CONFIG.channels.miniApp };
+  }
   config.channels.whatsapp.enabled = config.channels.whatsapp.enabled === true;
   config.channels.whatsapp.sessionDir = resolve(
     expandHome(config.channels.whatsapp.sessionDir || DEFAULT_CONFIG.channels.whatsapp.sessionDir)
   );
   config.channels.telegram.enabled = config.channels.telegram.enabled === true;
   config.channels.telegram.botToken = resolveEnvRef(config.channels.telegram.botToken || '');
+  config.channels.telegram.miniAppUrl = resolveEnvRef(config.channels.telegram.miniAppUrl || '');
   const pollIntervalMs = Number(config.channels.telegram.pollIntervalMs);
   config.channels.telegram.pollIntervalMs =
     Number.isFinite(pollIntervalMs) && pollIntervalMs > 0
@@ -257,6 +302,10 @@ export async function loadConfig(options = {}) {
   config.channels.teams.appPassword = resolveEnvRef(config.channels.teams.appPassword || '');
   config.channels.teams.appTenantId = resolveEnvRef(config.channels.teams.appTenantId || '');
   config.channels.teams.serviceUrl = resolveEnvRef(config.channels.teams.serviceUrl || '');
+  config.channels.miniApp.enabled = config.channels.miniApp.enabled === true;
+  config.channels.miniApp.allowedOrigin = resolveEnvRef(
+    config.channels.miniApp.allowedOrigin || ''
+  );
 
   const cronConfig = config?.cron && typeof config.cron === 'object' ? config.cron : {};
   config.cron = {

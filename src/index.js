@@ -33,6 +33,12 @@ import { TeamsAdapter } from './adapters/teams-adapter.js';
 import { TelegramAdapter } from './adapters/telegram-adapter.js';
 import { CronScheduler, createOvernightIntelJobs } from './cron.js';
 import { registerMiniAppRoutes } from './miniapp-routes.js';
+import { persistTelegramMiniAppFallback } from './miniapp-fallback.js';
+import {
+  enabledMiniAppLaunchUrl,
+  hasIndependentAuthentication,
+  validateTelegramInitData
+} from './http-auth.js';
 import { loadRunbookOverview } from './runbooks.js';
 import { getBrainBlueprint, updateBrainChecklistStep } from './brain-blueprint.js';
 
@@ -199,6 +205,7 @@ try {
 // Initialize components
 const sessionManager = new SessionManager(WORKSPACE);
 const app = express();
+app.set('trust proxy', 'loopback');
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -210,6 +217,7 @@ configureToolRuntime({
 
 // Initialize message router and adapters
 const messageRouter = new MessageRouter();
+const miniAppConfig = config.channels?.miniApp || { enabled: false, allowedOrigin: '' };
 
 // Initialize Teams adapter if configured
 let teamsAdapter = null;
@@ -241,6 +249,10 @@ if (telegramConfig.enabled && telegramConfig.botToken) {
   try {
     const telegramAdapter = new TelegramAdapter({
       ...telegramConfig,
+      miniAppUrl: enabledMiniAppLaunchUrl(
+        miniAppConfig.enabled,
+        telegramConfig.miniAppUrl
+      ),
       whisperApiKey: process.env.OPENAI_API_KEY || telegramConfig.whisperApiKey,
       whisperModel: telegramConfig.whisperModel || 'whisper-1'
     }, async (message) => {
@@ -250,6 +262,10 @@ if (telegramConfig.enabled && telegramConfig.botToken) {
       });
       if (message.reply) await message.reply(response);
       return response;
+    }, {
+      webAppDataHandler: miniAppConfig.enabled
+        ? async (message) => persistTelegramMiniAppFallback(sessionManager, message)
+        : null
     });
     messageRouter.registerAdapter('telegram', telegramAdapter);
     logger.info('Telegram adapter initialized with voice support');
@@ -339,9 +355,32 @@ app.use('/api/chat', chatLimiter);
 const teamsRouteHandler = teamsAdapter ? teamsAdapter.createRouteHandler() : null;
 
 app.use('/api', (req, res, next) => {
-  // Teams webhook authentication is handled by Bot Framework adapter.
-  if (teamsRouteHandler && req.method === 'POST' && req.path === '/messages') {
+  const isMiniAppSubmit = (
+    miniAppConfig.enabled
+    && req.method === 'POST'
+    && req.path === '/miniapp/submit'
+  );
+  const miniAppSubmitAuthenticated = isMiniAppSubmit && validateTelegramInitData(
+    req.get('X-Telegram-Init-Data') || '',
+    telegramConfig.botToken
+  );
+  if (hasIndependentAuthentication(req.method, req.path, {
+    teamsRouteEnabled: Boolean(teamsRouteHandler),
+    miniAppSubmitEnabled: miniAppConfig.enabled,
+    miniAppSubmitAuthenticated
+  })) {
     return next();
+  }
+
+  if (isMiniAppSubmit && !isGatewayTokenRequired()) {
+    logEvent('warn', 'miniapp_init_data_reject', {
+      requestId: req.requestId,
+      remote: req.socket?.remoteAddress || null
+    });
+    return res.status(401).json({
+      error: 'Valid Telegram init data is required',
+      requestId: req.requestId
+    });
   }
 
   if (!isGatewayTokenRequired()) {
@@ -401,12 +440,21 @@ if (teamsRouteHandler) {
   logger.info('Teams /api/messages endpoint registered');
 }
 
-// Register miniapp routes
-registerMiniAppRoutes(app, {
-  handleMessage,
-  pluginManager: null,
-  persistence: sessionManager
-});
+// Register Mini App routes only while the owned channel flag is enabled.
+if (miniAppConfig.enabled) {
+  registerMiniAppRoutes(app, {
+    handleMessage,
+    pluginManager: null,
+    persistence: sessionManager,
+    runtime: () => config.runtime,
+    miniApp: () => config.channels?.miniApp || miniAppConfig
+  });
+  logger.info('Mini App routes enabled', {
+    allowedOrigin: miniAppConfig.allowedOrigin || 'same-origin-only'
+  });
+} else {
+  logger.info('Mini App routes disabled by configuration');
+}
 
 // Cron jobs API
 app.get('/api/cron/jobs', async (req, res) => {
