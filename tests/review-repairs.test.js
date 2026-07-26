@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
 import express from 'express';
 
-import { enabledMiniAppLaunchUrl, hasIndependentAuthentication } from '../src/http-auth.js';
+import {
+  enabledMiniAppLaunchUrl,
+  hasIndependentAuthentication,
+  validateTelegramInitData
+} from '../src/http-auth.js';
 import { loadConfig } from '../src/config.js';
 import { persistTelegramMiniAppFallback } from '../src/miniapp-fallback.js';
 import {
@@ -15,7 +20,11 @@ import {
 } from '../src/miniapp-routes.js';
 
 test('only independently authenticated endpoints bypass the gateway token', () => {
-  const enabled = { teamsRouteEnabled: true, miniAppSubmitEnabled: true };
+  const enabled = {
+    teamsRouteEnabled: true,
+    miniAppSubmitEnabled: true,
+    miniAppSubmitAuthenticated: true
+  };
   assert.equal(hasIndependentAuthentication('POST', '/messages', enabled), true);
   assert.equal(hasIndependentAuthentication('POST', '/miniapp/submit', enabled), true);
   assert.equal(hasIndependentAuthentication('OPTIONS', '/miniapp/submit', enabled), true);
@@ -24,10 +33,47 @@ test('only independently authenticated endpoints bypass the gateway token', () =
   assert.equal(
     hasIndependentAuthentication('POST', '/miniapp/submit', {
       ...enabled,
+      miniAppSubmitAuthenticated: false
+    }),
+    false
+  );
+  assert.equal(
+    hasIndependentAuthentication('POST', '/miniapp/submit', {
+      ...enabled,
       miniAppSubmitEnabled: false
     }),
     false
   );
+});
+
+test('Telegram initData requires a fresh valid HMAC before public submit bypass', () => {
+  const botToken = '123456:test-token';
+  const nowMs = 1_750_000_000_000;
+  const authDate = Math.floor(nowMs / 1000);
+  const values = new URLSearchParams({
+    auth_date: String(authDate),
+    query_id: 'query-1',
+    user: '{"id":123,"first_name":"Customer"}'
+  });
+  const dataCheckString = [...values.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+  const secret = createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const hash = createHmac('sha256', secret).update(dataCheckString).digest('hex');
+  values.set('hash', hash);
+  const signed = values.toString();
+
+  assert.equal(validateTelegramInitData(signed, botToken, { nowMs }), true);
+  assert.equal(validateTelegramInitData(signed, 'wrong-token', { nowMs }), false);
+  assert.equal(
+    validateTelegramInitData(signed, botToken, {
+      nowMs: nowMs + (3601 * 1000)
+    }),
+    false
+  );
+  values.set('user', '{"id":999}');
+  assert.equal(validateTelegramInitData(values.toString(), botToken, { nowMs }), false);
 });
 
 test('advertised runtime and Mini App environment settings reach loaded config', async () => {
@@ -62,6 +108,12 @@ test('advertised runtime and Mini App environment settings reach loaded config',
     });
     assert.equal(launchOnly.channels.telegram.miniAppUrl, 'https://miniapp.example/app');
     assert.equal(launchOnly.channels.miniApp.allowedOrigin, '');
+
+    delete process.env.PHOENIX_MINIAPP_ENABLED;
+    const { config: optInDefault } = await loadConfig({
+      projectRoot: '/tmp/phoenix-echo-review'
+    });
+    assert.equal(optInDefault.channels.miniApp.enabled, false);
   } finally {
     for (const key of keys) {
       if (before[key] == null) delete process.env[key];

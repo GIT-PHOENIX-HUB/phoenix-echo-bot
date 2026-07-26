@@ -7,9 +7,11 @@ The integration layer between the Telegram Mini App (`phoenix-electric-miniapp`)
 - `src/miniapp-routes.js` (REAL, gated by `channels.miniApp.enabled` in `src/index.js`):
   - `POST /api/miniapp/submit` translates the live client types `service_request`, `generator_lead`, and
     `maintenance_request` to the runtime `/v1/intake/*` models. Missing/unknown types return 400.
-  - It forwards `X-Telegram-Init-Data` for runtime HMAC validation, forwards `X-Request-Id`, and aborts after
+  - The gateway validates Telegram `initData` HMAC and one-hour freshness before granting the public submit
+    exemption, then forwards it for runtime revalidation. It also forwards `X-Request-Id` and aborts after
     `runtime.timeoutMs` (502) instead of hanging.
-  - It is narrowly exempt from the private gateway token. The browser never receives that token.
+  - Only a valid Telegram submission is exempt from the private gateway token. The browser never receives
+    that token.
   - Cross-origin use requires one exact `channels.miniApp.allowedOrigin`; blank means same-origin proxy only.
   - Telegram `sendData` fallback is consumed by the active adapter and appended durably to
     `.phoenix-sessions/miniapp-fallback-<chat>.jsonl` for follow-up; it is not falsely reported as a runtime write.
@@ -20,14 +22,15 @@ The integration layer between the Telegram Mini App (`phoenix-electric-miniapp`)
 ## Config (names only)
 - `runtime.baseUrl` / env `PHOENIX_RUNTIME_URL` — runtime intake target
 - `runtime.timeoutMs` / env `PHOENIX_RUNTIME_TIMEOUT_MS` — positive upstream timeout
-- `channels.miniApp.enabled` / env `PHOENIX_MINIAPP_ENABLED`
+- `channels.miniApp.enabled` / env `PHOENIX_MINIAPP_ENABLED` — opt-in; default false
 - `channels.miniApp.allowedOrigin` / env `PHOENIX_MINIAPP_ALLOWED_ORIGIN`
 - `channels.telegram.miniAppUrl` / env `PHOENIX_TELEGRAM_MINIAPP_URL`
 
 ## Verify
-- Same-origin operator probe: `curl -s -X POST localhost:18790/api/miniapp/submit -H 'Content-Type: application/json' -d '{"type":"service_request"}'` → 502 "Backend rejected submission" without valid Telegram init data. It must not return a gateway-token 401.
+- Same-origin unauthenticated probe: `curl -s -X POST localhost:18790/api/miniapp/submit -H 'Content-Type: application/json' -d '{"type":"service_request"}'` → 401 without valid Telegram init data.
 - Configured cross-origin probe: preflight from the exact allowed origin returns 204 and only that origin is echoed.
-- With the real Mini App (valid initData): 2xx and the runtime's intake response inside `data.runtime`.
+- With the real Mini App (fresh valid initData): gateway HMAC passes, the runtime revalidates, and a valid
+  intake returns 2xx with the runtime response inside `data.runtime`.
 - Stop the runtime: the request returns bounded 502; a Telegram keyboard-button launch can deliver `sendData`,
   which produces a bot confirmation and a durable fallback session entry.
 

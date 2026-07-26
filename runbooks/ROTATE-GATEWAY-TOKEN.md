@@ -8,8 +8,8 @@ The bot's internal gateway surface on `:18790` — `WS /ws` and `/api/*` except 
 authenticated POST endpoints:
 
 - `/api/messages` is authenticated by the Microsoft Bot Framework adapter.
-- `/api/miniapp/submit` is authenticated by Telegram init-data HMAC at the Python runtime; its configured
-  CORS preflight is also exempt.
+- `/api/miniapp/submit` bypasses the gateway token only after Telegram init-data HMAC/freshness validation
+  in this gateway; the Python runtime revalidates it. Its configured CORS preflight is also exempt.
 
 The gateway token is compared with `timingSafeEqual` (`src/index.js`), so rotation is a value swap, not a
 code change.
@@ -21,7 +21,7 @@ Verified before writing this: every committed config (`config-vps.json`, `config
 therefore: new value → vault + host env → restart → verify. Zero code, zero config edits.
 
 ## Two env names are accepted, with strict precedence
-`resolveGatewayToken()` (`src/config.js:145-147`) reads:
+`resolveGatewayToken()` in `src/config.js` reads:
 ```
 process.env.PHOENIX_GATEWAY_TOKEN || process.env.PHOENIX_AUTH_TOKEN
 ```
@@ -59,8 +59,9 @@ effective primary value was not replaced (or the verifier tested the wrong host/
 only on a host where `PHOENIX_GATEWAY_TOKEN` is absent.
 
 ## Who does NOT hold this token (checked, so you don't chase ghosts)
-- **Mini App submit client** — exact POST `/api/miniapp/submit` authenticates by Telegram `initData` HMAC,
-  not this token. Other `/api/miniapp/*` routes remain gateway-internal unless separately redesigned.
+- **Mini App submit client** — exact POST `/api/miniapp/submit` authenticates by Telegram `initData` HMAC
+  in the gateway and runtime, not this token. Other `/api/miniapp/*` routes remain gateway-internal unless
+  separately redesigned.
 - **Command App** — talks to the Python runtime directly (MSAL bearer / tokenless `/v3/chat`), not to this bot.
 So no client app needs a rebuild or redeploy for this rotation.
 

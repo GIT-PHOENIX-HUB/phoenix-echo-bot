@@ -40,7 +40,7 @@
       "serviceUrl": "env:PHOENIX_TEAMS_SERVICE_URL"
     },
     "miniApp": {
-      "enabled": true,
+      "enabled": false,
       "allowedOrigin": "env:PHOENIX_MINIAPP_ALLOWED_ORIGIN"
     }
   },

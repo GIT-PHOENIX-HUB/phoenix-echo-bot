@@ -34,7 +34,11 @@ import { TelegramAdapter } from './adapters/telegram-adapter.js';
 import { CronScheduler, createOvernightIntelJobs } from './cron.js';
 import { registerMiniAppRoutes } from './miniapp-routes.js';
 import { persistTelegramMiniAppFallback } from './miniapp-fallback.js';
-import { enabledMiniAppLaunchUrl, hasIndependentAuthentication } from './http-auth.js';
+import {
+  enabledMiniAppLaunchUrl,
+  hasIndependentAuthentication,
+  validateTelegramInitData
+} from './http-auth.js';
 import { loadRunbookOverview } from './runbooks.js';
 import { getBrainBlueprint, updateBrainChecklistStep } from './brain-blueprint.js';
 
@@ -213,7 +217,7 @@ configureToolRuntime({
 
 // Initialize message router and adapters
 const messageRouter = new MessageRouter();
-const miniAppConfig = config.channels?.miniApp || { enabled: true, allowedOrigin: '' };
+const miniAppConfig = config.channels?.miniApp || { enabled: false, allowedOrigin: '' };
 
 // Initialize Teams adapter if configured
 let teamsAdapter = null;
@@ -351,11 +355,32 @@ app.use('/api/chat', chatLimiter);
 const teamsRouteHandler = teamsAdapter ? teamsAdapter.createRouteHandler() : null;
 
 app.use('/api', (req, res, next) => {
+  const isMiniAppSubmit = (
+    miniAppConfig.enabled
+    && req.method === 'POST'
+    && req.path === '/miniapp/submit'
+  );
+  const miniAppSubmitAuthenticated = isMiniAppSubmit && validateTelegramInitData(
+    req.get('X-Telegram-Init-Data') || '',
+    telegramConfig.botToken
+  );
   if (hasIndependentAuthentication(req.method, req.path, {
     teamsRouteEnabled: Boolean(teamsRouteHandler),
-    miniAppSubmitEnabled: miniAppConfig.enabled
+    miniAppSubmitEnabled: miniAppConfig.enabled,
+    miniAppSubmitAuthenticated
   })) {
     return next();
+  }
+
+  if (isMiniAppSubmit && !isGatewayTokenRequired()) {
+    logEvent('warn', 'miniapp_init_data_reject', {
+      requestId: req.requestId,
+      remote: req.socket?.remoteAddress || null
+    });
+    return res.status(401).json({
+      error: 'Valid Telegram init data is required',
+      requestId: req.requestId
+    });
   }
 
   if (!isGatewayTokenRequired()) {

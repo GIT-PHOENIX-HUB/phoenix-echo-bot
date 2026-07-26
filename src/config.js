@@ -46,7 +46,7 @@ const DEFAULT_CONFIG = {
       serviceUrl: ''
     },
     miniApp: {
-      enabled: true,
+      enabled: false,
       allowedOrigin: ''
     }
   },
@@ -302,7 +302,7 @@ export async function loadConfig(options = {}) {
   config.channels.teams.appPassword = resolveEnvRef(config.channels.teams.appPassword || '');
   config.channels.teams.appTenantId = resolveEnvRef(config.channels.teams.appTenantId || '');
   config.channels.teams.serviceUrl = resolveEnvRef(config.channels.teams.serviceUrl || '');
-  config.channels.miniApp.enabled = config.channels.miniApp.enabled !== false;
+  config.channels.miniApp.enabled = config.channels.miniApp.enabled === true;
   config.channels.miniApp.allowedOrigin = resolveEnvRef(
     config.channels.miniApp.allowedOrigin || ''
   );
