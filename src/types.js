@@ -61,7 +61,7 @@
 
 /**
  * @typedef {Object} MiniAppSubmission
- * @property {string} type - Submission type (service_request|generator_lead|maintenance_booking|quote_request)
+ * @property {string} type - Submission type (service_request|generator_lead|maintenance_booking). quote_request is rejected until the runtime exposes a quote intake contract.
  * @property {string} name - Customer name
  * @property {string} phone - Customer phone
  * @property {string} email - Customer email

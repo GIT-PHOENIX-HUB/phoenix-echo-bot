@@ -16,7 +16,8 @@ const DEFAULT_CONFIG = {
   runtime: {
     baseUrl: 'http://127.0.0.1:9120',
     wsUrl: 'ws://127.0.0.1:9120/ws',
-    token: ''
+    token: '',
+    timeoutMs: 10000
   },
   agent: {
     model: 'claude-sonnet-4-5-20250929',
@@ -147,6 +148,12 @@ export function resolveGatewayToken(config) {
   return String(fromEnv || fromConfig).trim();
 }
 
+export function resolveRuntimeToken(config) {
+  const fromConfig = resolveEnvRef(config?.runtime?.token || '');
+  const fromEnv = process.env.PHOENIX_RUNTIME_TOKEN || '';
+  return String(fromEnv || fromConfig).trim();
+}
+
 export async function loadConfig(options = {}) {
   const projectRoot = options.projectRoot || process.cwd();
   const configPath = expandHome(process.env.PHOENIX_CONFIG_PATH || '~/.phoenix-echo/config.json');
@@ -195,6 +202,21 @@ export async function loadConfig(options = {}) {
   if (process.env.PHOENIX_LOG_FILE) {
     config.logging.file = process.env.PHOENIX_LOG_FILE;
   }
+  if (!isObject(config.runtime)) {
+    config.runtime = { ...DEFAULT_CONFIG.runtime };
+  }
+  if (process.env.PHOENIX_RUNTIME_URL) {
+    config.runtime.baseUrl = process.env.PHOENIX_RUNTIME_URL;
+  }
+  if (process.env.PHOENIX_RUNTIME_WS_URL) {
+    config.runtime.wsUrl = process.env.PHOENIX_RUNTIME_WS_URL;
+  }
+  if (process.env.PHOENIX_RUNTIME_TOKEN) {
+    config.runtime.token = process.env.PHOENIX_RUNTIME_TOKEN;
+  }
+  if (process.env.PHOENIX_RUNTIME_TIMEOUT_MS) {
+    config.runtime.timeoutMs = process.env.PHOENIX_RUNTIME_TIMEOUT_MS;
+  }
   if (process.env.PHOENIX_AUTH_MODE) {
     config.gateway.auth.mode = process.env.PHOENIX_AUTH_MODE;
   }
@@ -233,6 +255,16 @@ export async function loadConfig(options = {}) {
   config.logging.file = expandHome(config.logging.file || '');
   config.gateway.auth.mode = String(config.gateway.auth.mode || 'token').toLowerCase();
   config.gateway.auth.token = resolveGatewayToken(config);
+  config.runtime.baseUrl = String(config.runtime.baseUrl || DEFAULT_CONFIG.runtime.baseUrl)
+    .trim()
+    .replace(/\/+$/, '');
+  config.runtime.wsUrl = String(config.runtime.wsUrl || DEFAULT_CONFIG.runtime.wsUrl).trim();
+  config.runtime.token = resolveRuntimeToken(config);
+  const runtimeTimeoutMs = Math.floor(Number(config.runtime.timeoutMs));
+  if (!Number.isFinite(runtimeTimeoutMs) || runtimeTimeoutMs <= 0 || runtimeTimeoutMs > 120000) {
+    throw new Error(`Invalid runtime timeout: ${config.runtime.timeoutMs}`);
+  }
+  config.runtime.timeoutMs = runtimeTimeoutMs;
 
   if (!isObject(config.channels)) {
     config.channels = {};
@@ -357,6 +389,7 @@ export function createConfigWatcher(configPath, reloadFn) {
 export default {
   loadConfig,
   resolveGatewayToken,
+  resolveRuntimeToken,
   expandHome,
   createConfigWatcher
 };
