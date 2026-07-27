@@ -33,6 +33,7 @@ import { TeamsAdapter } from './adapters/teams-adapter.js';
 import { TelegramAdapter } from './adapters/telegram-adapter.js';
 import { CronScheduler, createOvernightIntelJobs } from './cron.js';
 import { registerMiniAppRoutes } from './miniapp-routes.js';
+import { hasIndependentApiAuth } from './gateway-auth-policy.js';
 import { loadRunbookOverview } from './runbooks.js';
 import { getBrainBlueprint, updateBrainChecklistStep } from './brain-blueprint.js';
 
@@ -339,8 +340,12 @@ app.use('/api/chat', chatLimiter);
 const teamsRouteHandler = teamsAdapter ? teamsAdapter.createRouteHandler() : null;
 
 app.use('/api', (req, res, next) => {
-  // Teams webhook authentication is handled by Bot Framework adapter.
-  if (teamsRouteHandler && req.method === 'POST' && req.path === '/messages') {
+  if (hasIndependentApiAuth({
+    method: req.method,
+    path: req.path,
+    teamsEnabled: Boolean(teamsRouteHandler),
+    hasTelegramInitData: Boolean(req.get('X-Telegram-Init-Data')?.trim())
+  })) {
     return next();
   }
 
@@ -405,7 +410,8 @@ if (teamsRouteHandler) {
 registerMiniAppRoutes(app, {
   handleMessage,
   pluginManager: null,
-  persistence: sessionManager
+  persistence: sessionManager,
+  runtime: () => config.runtime
 });
 
 // Cron jobs API
