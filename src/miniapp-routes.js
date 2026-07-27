@@ -5,6 +5,7 @@
  */
 
 import { getDefaultLogger } from './logger.js';
+import { envelope } from './contracts/rest-contracts.js';
 
 const logger = getDefaultLogger();
 
@@ -179,7 +180,8 @@ export async function forwardMiniAppSubmission(data, context = {}) {
       method: 'POST',
       headers,
       body: JSON.stringify(normalized.body),
-      signal: controller.signal
+      signal: controller.signal,
+      redirect: 'manual'
     });
     if (!upstream.ok) {
       try {
@@ -258,6 +260,10 @@ export function registerMiniAppRoutes(app, deps = {}) {
       };
       req.once('aborted', abortOnDisconnect);
       res.once('close', abortOnDisconnect);
+      if (req.aborted || res.destroyed) {
+        disconnectController.abort();
+        return;
+      }
 
       let forwarded;
       try {
@@ -274,11 +280,12 @@ export function registerMiniAppRoutes(app, deps = {}) {
           error: error.message,
           requestId: req.requestId
         });
-        return res.status(error.status || 502).json({
+        return res.status(error.status || 502).json(envelope({
           success: false,
+          data: null,
           error: error.message,
           requestId: req.requestId
-        });
+        }));
       } finally {
         req.removeListener('aborted', abortOnDisconnect);
         res.removeListener('close', abortOnDisconnect);
@@ -286,19 +293,22 @@ export function registerMiniAppRoutes(app, deps = {}) {
 
       const receipt = publicRuntimeReceipt(forwarded.result);
       if (req.aborted || res.destroyed) return;
-      res.json({
-        success: true,
+      res.json(envelope({
         data: {
           received: true,
           type: forwarded.normalized.type,
           ...(Object.keys(receipt).length > 0 ? { receipt } : {})
         },
-        requestId: req.requestId,
-        timestamp: new Date().toISOString()
-      });
+        requestId: req.requestId
+      }));
     } catch (error) {
       logger.error('MiniApp submit error', { error: error.message });
-      res.status(502).json({ success: false, error: 'Backend unreachable', requestId: req.requestId });
+      res.status(502).json(envelope({
+        success: false,
+        data: null,
+        error: 'Backend unreachable',
+        requestId: req.requestId
+      }));
     }
   });
 

@@ -182,6 +182,31 @@ test('rejected upstream response bodies are cancelled before returning', async (
   assert.equal(cancelled, true);
 });
 
+test('credentialed forwarding refuses automatic redirects', async () => {
+  let redirectMode;
+  await assert.rejects(
+    forwardMiniAppSubmission(
+      { type: 'service_request' },
+      {
+        runtime: {
+          baseUrl: 'http://runtime.test',
+          token: 'runtime-test-token'
+        },
+        initData: 'telegram-init',
+        fetchImpl: async (_url, options) => {
+          redirectMode = options.redirect;
+          return new Response(null, {
+            status: 307,
+            headers: { Location: 'https://untrusted.example/collect' }
+          });
+        }
+      }
+    ),
+    (error) => error.status === 502
+  );
+  assert.equal(redirectMode, 'manual');
+});
+
 test('malformed successful JSON is an upstream failure', async () => {
   await assert.rejects(
     forwardMiniAppSubmission(
@@ -355,6 +380,8 @@ test('HTTP response returns only the allowlisted runtime receipt', async () => {
   };
 
   await routes.get('POST /api/miniapp/submit')(req, res);
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.error, null);
   assert.deepEqual(res.body.data, {
     received: true,
     type: 'service_request',
@@ -362,6 +389,83 @@ test('HTTP response returns only the allowlisted runtime receipt', async () => {
   });
   assert.equal(JSON.stringify(res.body).includes('customer_phone'), false);
   assert.equal(JSON.stringify(res.body).includes('debug'), false);
+});
+
+test('HTTP forwarding failures use the canonical response envelope', async () => {
+  const routes = new Map();
+  const app = {
+    post(path, handler) {
+      routes.set(`POST ${path}`, handler);
+    },
+    get() {}
+  };
+  registerMiniAppRoutes(app, {
+    runtime: { baseUrl: '' }
+  });
+
+  const req = new EventEmitter();
+  req.body = { type: 'service_request' };
+  req.requestId = 'request-failure';
+  req.get = () => 'telegram-init';
+  req.aborted = false;
+
+  const res = new EventEmitter();
+  res.writableEnded = false;
+  res.destroyed = false;
+  res.status = function status(code) {
+    this.statusCode = code;
+    return this;
+  };
+  res.json = function json(body) {
+    this.body = body;
+    this.writableEnded = true;
+    return this;
+  };
+
+  await routes.get('POST /api/miniapp/submit')(req, res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.success, false);
+  assert.equal(res.body.data, null);
+  assert.equal(res.body.error, 'Backend not configured');
+  assert.equal(res.body.requestId, 'request-failure');
+  assert.equal(Number.isNaN(Date.parse(res.body.timestamp)), false);
+});
+
+test('already-disconnected HTTP requests never start runtime forwarding', async () => {
+  const routes = new Map();
+  const app = {
+    post(path, handler) {
+      routes.set(`POST ${path}`, handler);
+    },
+    get() {}
+  };
+  let fetchCalled = false;
+  registerMiniAppRoutes(app, {
+    runtime: { baseUrl: 'http://runtime.test' },
+    fetchImpl: async () => {
+      fetchCalled = true;
+      return jsonResponse({});
+    }
+  });
+
+  const req = new EventEmitter();
+  req.body = { type: 'service_request' };
+  req.requestId = 'request-already-aborted';
+  req.get = () => 'telegram-init';
+  req.aborted = true;
+
+  const res = new EventEmitter();
+  res.writableEnded = false;
+  res.destroyed = false;
+  res.status = function status() {
+    assert.fail('must not write after a prior disconnect');
+  };
+  res.json = function json() {
+    assert.fail('must not write after a prior disconnect');
+  };
+
+  await routes.get('POST /api/miniapp/submit')(req, res);
+  assert.equal(fetchCalled, false);
 });
 
 test('HTTP client disconnect aborts forwarding without writing a response', async () => {
