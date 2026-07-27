@@ -21,7 +21,7 @@ export function buildTelegramPollingOptions(config = {}) {
       interval,
       params: { timeout: 30 }
     },
-    request: { timeout: 30000 }
+    request: { timeout: 45000 }
   };
 }
 

@@ -13,6 +13,7 @@ import { constants as fsConstants } from 'fs';
 import { access, mkdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { getDefaultLogger } from '../logger.js';
+import { evaluateWhatsAppInbound } from './whatsapp-policy.js';
 
 const logger = getDefaultLogger();
 
@@ -120,6 +121,7 @@ export class WhatsAppChannel {
 
         const contact = await message.getContact();
         const chat = await message.getChat();
+        const chatId = chat.id._serialized;
 
         logger.info('WhatsApp message received', {
           from: contact.number,
@@ -128,16 +130,36 @@ export class WhatsAppChannel {
           hasMedia: message.hasMedia
         });
 
+        const policy = evaluateWhatsAppInbound(
+          {
+            chatId,
+            isGroup: chat.isGroup,
+            body: message.body
+          },
+          this.config.allowedGroupIds
+        );
+        if (!policy.accepted) {
+          logger.info('WhatsApp message ignored by inbound policy', {
+            from: contact.number,
+            chatId,
+            isGroup: chat.isGroup,
+            messageType: message.type,
+            hasMedia: message.hasMedia,
+            reason: policy.reason
+          });
+          return;
+        }
+
         // Call message handler if registered
         if (this.messageHandler) {
           await this.messageHandler({
             id: message.id._serialized,
             from: contact.number,
             fromName: contact.pushname || contact.name || contact.number,
-            chatId: chat.id._serialized,
+            chatId,
             isGroup: chat.isGroup,
             groupName: chat.isGroup ? chat.name : null,
-            body: message.body,
+            body: policy.text,
             type: message.type,
             timestamp: message.timestamp,
             hasMedia: message.hasMedia,
@@ -294,14 +316,18 @@ export class WhatsAppChannel {
  * @param {Function} messageHandler - Message handler function
  * @returns {WhatsAppChannel} WhatsApp channel instance
  */
-export async function createWhatsAppChannel(config, messageHandler) {
+export function createWhatsAppChannel(config, messageHandler) {
   const channel = new WhatsAppChannel(config);
   
   if (messageHandler) {
     channel.onMessage(messageHandler);
   }
 
-  await channel.start();
+  void channel.start().catch((error) => {
+    logger.error('WhatsApp asynchronous startup failed', {
+      error: error?.message || String(error)
+    });
+  });
   
   return channel;
 }

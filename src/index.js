@@ -216,7 +216,7 @@ const messageRouter = new MessageRouter();
 const whatsappConfig = config.channels?.whatsapp || { enabled: false };
 if (whatsappConfig.enabled) {
   try {
-    const whatsappChannel = await createWhatsAppChannel(whatsappConfig, async (message) => {
+    const whatsappChannel = createWhatsAppChannel(whatsappConfig, async (message) => {
       const sessionId = `whatsapp-${message.chatId}`;
       const response = await handleMessage(sessionId, message.body, {
         source: 'whatsapp',

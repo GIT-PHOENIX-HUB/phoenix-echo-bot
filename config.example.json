@@ -24,7 +24,8 @@
   "channels": {
     "whatsapp": {
       "enabled": false,
-      "sessionDir": "/Users/shanewarehime/.phoenix-echo/whatsapp-session"
+      "sessionDir": "/Users/shanewarehime/.phoenix-echo/whatsapp-session",
+      "allowedGroupIds": []
     },
     "telegram": {
       "enabled": false,

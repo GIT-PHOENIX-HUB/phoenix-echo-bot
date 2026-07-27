@@ -10,7 +10,9 @@ the gateway.
 
 ## Config (names only)
 - `channels.teams.enabled` (default false)
-- `channels.teams.appId` / `appPassword` / `appTenantId` / `serviceUrl` ← env `PHOENIX_TEAMS_APP_ID` / `PHOENIX_TEAMS_APP_PASSWORD` / `PHOENIX_TEAMS_APP_TENANT_ID` / `PHOENIX_TEAMS_SERVICE_URL`
+- `channels.teams.appId` / `appPassword` ← env `PHOENIX_TEAMS_APP_ID` / `PHOENIX_TEAMS_APP_PASSWORD`
+- `channels.teams.appTenantId` / `serviceUrl` ← env `PHOENIX_TEAMS_APP_TENANT_ID` /
+  `PHOENIX_TEAMS_SERVICE_URL`; these are config slots only and are not enforced by the live adapter.
 - Azure side: a Bot Channels Registration pointing its messaging endpoint at this bot's public `/api/messages`.
 
 ## Enable
@@ -20,7 +22,9 @@ the gateway.
 
 ## Verify
 - @mention or DM the bot in Teams → reply arrives; bot log shows the activity.
-- Wrong/missing tenant or appId → auth errors in log; fix registration, don't bypass.
+- Wrong/missing app ID, password, or Azure Bot registration → auth or delivery errors in the log; fix
+  the credential/registration, don't bypass.
+- Changing `appTenantId` or `serviceUrl` does not currently alter `TeamsAdapter` authentication or routing.
 ## Disable / rollback
 Follow [the shared active-config procedure](README.md#find-the-active-config), set
 `channels.teams.enabled` to `false`, restart, and confirm `teams` is absent from

@@ -13,7 +13,8 @@ Employee lane: the Phoenix/Electrical Guru for every employee — contractor-wor
 
 ## Verify (today)
 - Employee flows verify against the runtime, not the bot: `curl -s -o /dev/null -w "%{http_code}" -X POST localhost:9120/v1/timeclock -H 'Content-Type: application/json' -d '{}'` → 401 (MSAL gate up).
-- `channels.commandApp.enabled` false → the bot logs nothing for this channel. Enabling logs one init line; that's all it does — honest scaffold.
+- The gateway does not read `channels.commandApp.enabled`, import `CommandAppChannel`, or emit a
+  Command App initialization line. Changing the flag has no runtime effect today.
 ## Disable / rollback
 The Command App talks directly to the runtime; there is no live bot adapter to disable here. Use
 the Command App deployment's own rollback and

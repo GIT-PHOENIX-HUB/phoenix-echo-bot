@@ -15,7 +15,8 @@ Email in/out of the hub (company mailboxes).
 Graph-first (tenant's own app registrations, cert auth — the Mail Courier pattern), not IMAP password auth; subscription webhook for inbound; replies draft-first through the approval surface.
 
 ## Verify (today)
-`channels.outlook.enabled: false` stays false; enabling logs `[Outlook] Channel initialized` and nothing else — that log line is the proof it's a scaffold.
+The gateway does not read `channels.outlook.enabled`, import `OutlookChannel`, or emit an Outlook
+initialization line. Changing the flag has no runtime effect today.
 ## Disable / rollback
 This channel is a scaffold and has no live adapter to disable. Use
 [the shared active-config procedure](README.md#find-the-active-config) for live channels.

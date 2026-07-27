@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { resolve } from 'path';
+import { normalizeWhatsAppGroupIds } from './channels/whatsapp-policy.js';
 
 const DEFAULT_CONFIG = {
   gateway: {
@@ -31,7 +32,8 @@ const DEFAULT_CONFIG = {
   channels: {
     whatsapp: {
       enabled: false,
-      sessionDir: '~/.phoenix-echo/whatsapp-session'
+      sessionDir: '~/.phoenix-echo/whatsapp-session',
+      allowedGroupIds: []
     },
     telegram: {
       enabled: false,
@@ -204,6 +206,9 @@ export async function loadConfig(options = {}) {
   if (process.env.PHOENIX_WHATSAPP_ENABLED) {
     config.channels.whatsapp.enabled = process.env.PHOENIX_WHATSAPP_ENABLED === 'true';
   }
+  if (process.env.PHOENIX_WHATSAPP_ALLOWED_GROUP_IDS !== undefined) {
+    config.channels.whatsapp.allowedGroupIds = process.env.PHOENIX_WHATSAPP_ALLOWED_GROUP_IDS;
+  }
   if (process.env.PHOENIX_TELEGRAM_ENABLED) {
     config.channels.telegram.enabled = process.env.PHOENIX_TELEGRAM_ENABLED === 'true';
   }
@@ -261,6 +266,9 @@ export async function loadConfig(options = {}) {
   config.channels.whatsapp.enabled = config.channels.whatsapp.enabled === true;
   config.channels.whatsapp.sessionDir = resolve(
     expandHome(config.channels.whatsapp.sessionDir || DEFAULT_CONFIG.channels.whatsapp.sessionDir)
+  );
+  config.channels.whatsapp.allowedGroupIds = normalizeWhatsAppGroupIds(
+    config.channels.whatsapp.allowedGroupIds
   );
   config.channels.telegram.enabled = config.channels.telegram.enabled === true;
   config.channels.telegram.botToken = resolveEnvRef(config.channels.telegram.botToken || '');
