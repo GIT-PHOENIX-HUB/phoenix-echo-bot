@@ -21,6 +21,9 @@
       "botToken": "env:TELEGRAM_BOT_TOKEN",
       "pollIntervalMs": 300
     },
+    "miniApp": {
+      "enabled": true
+    },
     "whatsapp": {
       "enabled": false
     },

@@ -8,6 +8,9 @@
   },
   "workspace": "~/Phoenix_Local/PHOENIX-ECHO-GATEWAY-MASTER-RUNBOOK",
   "channels": {
+    "miniApp": {
+      "enabled": true
+    },
     "whatsapp": {
       "enabled": false
     },

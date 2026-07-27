@@ -15,7 +15,9 @@ Employee lane: the Phoenix/Electrical Guru for every employee — contractor-wor
 - Employee flows verify against the runtime, not the bot: `curl -s -o /dev/null -w "%{http_code}" -X POST localhost:9120/v1/timeclock -H 'Content-Type: application/json' -d '{}'` → 401 (MSAL gate up).
 - `channels.commandApp.enabled` false → the bot logs nothing for this channel. Enabling logs one init line; that's all it does — honest scaffold.
 ## Disable / rollback
-Set the channel's `enabled` flag to `false` in the active config (`config-vps.json` / `config-studio.json`) and restart the bot — a disabled channel logs one "disabled in config" line and touches nothing. Rollback is always config-only; no code changes.
+The Command App talks directly to the runtime; there is no live bot adapter to disable here. Use
+the Command App deployment's own rollback and
+[the shared active-config procedure](README.md#find-the-active-config) only for live bot channels.
 
 ## Escalation
 Channel down or misbehaving → post to the oversight channel (FORMATION/COMMS) with the bot log lines; secrets NEVER in the post. Credential slots live in the vault/env, never in this repo. Outbound to customers is draft-first wherever an approval surface exists — never auto-send beyond the channel's scoped, ruled behavior.

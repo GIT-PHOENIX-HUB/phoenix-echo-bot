@@ -31,6 +31,7 @@ import { configureDefaultLogger, getDefaultLogger } from './logger.js';
 import { MessageRouter } from './message-router.js';
 import { TeamsAdapter } from './adapters/teams-adapter.js';
 import { TelegramAdapter } from './adapters/telegram-adapter.js';
+import { createWhatsAppChannel } from './channels/whatsapp.js';
 import { CronScheduler, createOvernightIntelJobs } from './cron.js';
 import { registerMiniAppRoutes } from './miniapp-routes.js';
 import { loadRunbookOverview } from './runbooks.js';
@@ -210,6 +211,30 @@ configureToolRuntime({
 
 // Initialize message router and adapters
 const messageRouter = new MessageRouter();
+
+// Initialize WhatsApp adapter if configured.
+const whatsappConfig = config.channels?.whatsapp || { enabled: false };
+if (whatsappConfig.enabled) {
+  try {
+    const whatsappChannel = await createWhatsAppChannel(whatsappConfig, async (message) => {
+      const sessionId = `whatsapp-${message.chatId}`;
+      const response = await handleMessage(sessionId, message.body, {
+        source: 'whatsapp',
+        from: message.fromName,
+        chatId: message.chatId,
+        isGroup: message.isGroup
+      });
+      if (message.reply) {
+        await message.reply(response);
+      }
+      return response;
+    });
+    messageRouter.registerAdapter('whatsapp', whatsappChannel);
+    logger.info('WhatsApp channel initialized and registered');
+  } catch (error) {
+    logger.error('Failed to initialize WhatsApp channel', { error: error.message });
+  }
+}
 
 // Initialize Teams adapter if configured
 let teamsAdapter = null;
@@ -401,11 +426,17 @@ if (teamsRouteHandler) {
   logger.info('Teams /api/messages endpoint registered');
 }
 
-// Register miniapp routes
-registerMiniAppRoutes(app, {
-  handleMessage,
-  pluginManager: null,
-  persistence: sessionManager, runtime: config.runtime});
+// Register Mini App routes only while the operator-controlled surface is enabled.
+if (config.channels?.miniApp?.enabled) {
+  registerMiniAppRoutes(app, {
+    handleMessage,
+    pluginManager: null,
+    persistence: sessionManager,
+    runtime: config.runtime
+  });
+} else {
+  logger.info('MiniApp routes disabled in config');
+}
 
 // Cron jobs API
 app.get('/api/cron/jobs', async (req, res) => {

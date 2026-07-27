@@ -17,7 +17,8 @@ Graph-first (tenant's own app registrations, cert auth — the Mail Courier patt
 ## Verify (today)
 `channels.outlook.enabled: false` stays false; enabling logs `[Outlook] Channel initialized` and nothing else — that log line is the proof it's a scaffold.
 ## Disable / rollback
-Set the channel's `enabled` flag to `false` in the active config (`config-vps.json` / `config-studio.json`) and restart the bot — a disabled channel logs one "disabled in config" line and touches nothing. Rollback is always config-only; no code changes.
+This channel is a scaffold and has no live adapter to disable. Use
+[the shared active-config procedure](README.md#find-the-active-config) for live channels.
 
 ## Escalation
 Channel down or misbehaving → post to the oversight channel (FORMATION/COMMS) with the bot log lines; secrets NEVER in the post. Credential slots live in the vault/env, never in this repo. Outbound to customers is draft-first wherever an approval surface exists — never auto-send beyond the channel's scoped, ruled behavior.

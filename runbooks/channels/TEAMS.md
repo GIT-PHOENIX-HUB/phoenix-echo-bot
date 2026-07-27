@@ -4,11 +4,13 @@
 Reach the agents from inside the company's Teams — employee side of the hub.
 
 ## Current state — REAL adapter
-`src/channels/teams.js` (~287 lines): Azure Bot Framework SDK; messaging endpoint `/api/messages`; activity handling + conversational flow.
+`src/index.js` constructs `src/adapters/teams-adapter.js`, the live Azure Bot Framework adapter,
+and registers its messaging endpoint at `/api/messages`. `src/channels/teams.js` is not used by
+the gateway.
 
 ## Config (names only)
 - `channels.teams.enabled` (default false)
-- `channels.teams.appId` / `appPassword` / `appTenantId` / `serviceUrl` ← env `PHOENIX_TEAMS_APP_ID` / `PHOENIX_TEAMS_APP_PASSWORD` / `PHOENIX_TEAMS_TENANT_ID`
+- `channels.teams.appId` / `appPassword` / `appTenantId` / `serviceUrl` ← env `PHOENIX_TEAMS_APP_ID` / `PHOENIX_TEAMS_APP_PASSWORD` / `PHOENIX_TEAMS_APP_TENANT_ID` / `PHOENIX_TEAMS_SERVICE_URL`
 - Azure side: a Bot Channels Registration pointing its messaging endpoint at this bot's public `/api/messages`.
 
 ## Enable
@@ -20,7 +22,9 @@ Reach the agents from inside the company's Teams — employee side of the hub.
 - @mention or DM the bot in Teams → reply arrives; bot log shows the activity.
 - Wrong/missing tenant or appId → auth errors in log; fix registration, don't bypass.
 ## Disable / rollback
-Set the channel's `enabled` flag to `false` in the active config (`config-vps.json` / `config-studio.json`) and restart the bot — a disabled channel logs one "disabled in config" line and touches nothing. Rollback is always config-only; no code changes.
+Follow [the shared active-config procedure](README.md#find-the-active-config), set
+`channels.teams.enabled` to `false`, restart, and confirm `teams` is absent from
+`/api/channels/status`.
 
 ## Escalation
 Channel down or misbehaving → post to the oversight channel (FORMATION/COMMS) with the bot log lines; secrets NEVER in the post. Credential slots live in the vault/env, never in this repo. Outbound to customers is draft-first wherever an approval surface exists — never auto-send beyond the channel's scoped, ruled behavior.

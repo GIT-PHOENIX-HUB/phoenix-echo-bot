@@ -31,6 +31,9 @@
       "botToken": "env:PHOENIX_TELEGRAM_BOT_TOKEN",
       "pollIntervalMs": 300
     },
+    "miniApp": {
+      "enabled": true
+    },
     "teams": {
       "enabled": false,
       "appId": "env:PHOENIX_TEAMS_APP_ID",

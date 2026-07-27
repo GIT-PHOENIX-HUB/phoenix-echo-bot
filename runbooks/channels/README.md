@@ -12,8 +12,18 @@ Shane's ruling (2/60): the echo bot is the connection between all terminals — 
 | [COMMAND-APP](COMMAND-APP.md) | App goes runtime-direct; bot layer scaffold (convergence = design call) | Employee |
 
 Shared substrate: the bot serves on `:18790`; the Phoenix runtime it fronts is `phoenix.runtime.app:gateway` on `:9120` (`runtime{}` block in config). Secrets: slots only, vault-held, never committed.
+
+## Find the active config
+The startup log entry `Phoenix Echo Gateway starting` records the resolved `configPath`. That exact
+file is authoritative for the running process: it is `PHOENIX_CONFIG_PATH` when the service sets
+that variable, otherwise `~/.phoenix-echo/config.json`. The checked-in `config-vps.json` and
+`config-studio.json` files are templates unless the startup log names one of them.
+
 ## Disable / rollback
-Set the channel's `enabled` flag to `false` in the active config (`config-vps.json` / `config-studio.json`) and restart the bot — a disabled channel logs one "disabled in config" line and touches nothing. Rollback is always config-only; no code changes.
+Read `configPath` from the startup log, set the channel's `enabled` flag to `false` in that exact
+file, and restart the bot. Confirm the adapter is absent from `/api/channels/status`; for the Mini
+App, confirm `/api/miniapp/health` returns 404. Include `X-Phoenix-Token` when gateway authentication
+is configured. Do not edit a checked-in template unless it is the logged active path.
 
 ## Escalation
 Channel down or misbehaving → post to the oversight channel (FORMATION/COMMS) with the bot log lines; secrets NEVER in the post. Credential slots live in the vault/env, never in this repo. Outbound to customers is draft-first wherever an approval surface exists — never auto-send beyond the channel's scoped, ruled behavior.

@@ -10,6 +10,21 @@ import { getDefaultLogger } from '../logger.js';
 
 const logger = getDefaultLogger();
 
+export function buildTelegramPollingOptions(config = {}) {
+  const configuredInterval = Number(config.pollIntervalMs);
+  const interval =
+    Number.isFinite(configuredInterval) && configuredInterval > 0
+      ? Math.max(100, Math.floor(configuredInterval))
+      : 300;
+  return {
+    polling: {
+      interval,
+      params: { timeout: 30 }
+    },
+    request: { timeout: 30000 }
+  };
+}
+
 export class TelegramAdapter {
   constructor(config, messageHandler) {
     this.config = config;
@@ -22,10 +37,14 @@ export class TelegramAdapter {
       return;
     }
 
-    this.bot = new TelegramBot(config.botToken, { polling: true, request: { timeout: 30000 } });
+    const clientOptions = buildTelegramPollingOptions(config);
+    this.bot = new TelegramBot(config.botToken, clientOptions);
     this._setupHandlers();
     this.ready = true;
-    logger.info('TelegramAdapter initialized', { polling: true });
+    logger.info('TelegramAdapter initialized', {
+      polling: true,
+      pollIntervalMs: clientOptions.polling.interval
+    });
   }
 
   _setupHandlers() {

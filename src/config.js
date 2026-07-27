@@ -38,6 +38,9 @@ const DEFAULT_CONFIG = {
       botToken: '',
       pollIntervalMs: 300
     },
+    miniApp: {
+      enabled: true
+    },
     teams: {
       enabled: false,
       appId: '',
@@ -198,6 +201,9 @@ export async function loadConfig(options = {}) {
   if (process.env.PHOENIX_AUTH_MODE) {
     config.gateway.auth.mode = process.env.PHOENIX_AUTH_MODE;
   }
+  if (process.env.PHOENIX_WHATSAPP_ENABLED) {
+    config.channels.whatsapp.enabled = process.env.PHOENIX_WHATSAPP_ENABLED === 'true';
+  }
   if (process.env.PHOENIX_TELEGRAM_ENABLED) {
     config.channels.telegram.enabled = process.env.PHOENIX_TELEGRAM_ENABLED === 'true';
   }
@@ -206,6 +212,9 @@ export async function loadConfig(options = {}) {
   }
   if (process.env.PHOENIX_TELEGRAM_POLL_INTERVAL_MS) {
     config.channels.telegram.pollIntervalMs = Number(process.env.PHOENIX_TELEGRAM_POLL_INTERVAL_MS);
+  }
+  if (process.env.PHOENIX_MINIAPP_ENABLED) {
+    config.channels.miniApp.enabled = process.env.PHOENIX_MINIAPP_ENABLED === 'true';
   }
   if (process.env.PHOENIX_TEAMS_ENABLED) {
     config.channels.teams.enabled = process.env.PHOENIX_TEAMS_ENABLED === 'true';
@@ -243,6 +252,9 @@ export async function loadConfig(options = {}) {
   if (!isObject(config.channels.telegram)) {
     config.channels.telegram = { ...DEFAULT_CONFIG.channels.telegram };
   }
+  if (!isObject(config.channels.miniApp)) {
+    config.channels.miniApp = { ...DEFAULT_CONFIG.channels.miniApp };
+  }
   if (!isObject(config.channels.teams)) {
     config.channels.teams = { ...DEFAULT_CONFIG.channels.teams };
   }
@@ -257,6 +269,7 @@ export async function loadConfig(options = {}) {
     Number.isFinite(pollIntervalMs) && pollIntervalMs > 0
       ? Math.max(100, Math.floor(pollIntervalMs))
       : DEFAULT_CONFIG.channels.telegram.pollIntervalMs;
+  config.channels.miniApp.enabled = config.channels.miniApp.enabled !== false;
   config.channels.teams.enabled = config.channels.teams.enabled === true;
   config.channels.teams.appId = resolveEnvRef(config.channels.teams.appId || '');
   config.channels.teams.appPassword = resolveEnvRef(config.channels.teams.appPassword || '');
