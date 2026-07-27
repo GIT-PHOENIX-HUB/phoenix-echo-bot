@@ -182,6 +182,14 @@ export async function forwardMiniAppSubmission(data, context = {}) {
       signal: controller.signal
     });
     if (!upstream.ok) {
+      try {
+        await upstream.body?.cancel();
+      } catch (cancelError) {
+        logger.warn('MiniApp submit: failed to cancel rejected runtime body', {
+          error: cancelError.message,
+          requestId
+        });
+      }
       logger.error('MiniApp submit: runtime rejected', {
         status: upstream.status,
         requestId
@@ -198,7 +206,8 @@ export async function forwardMiniAppSubmission(data, context = {}) {
     let result;
     try {
       result = await upstream.json();
-    } catch {
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
       throw new MiniAppForwardError('Backend returned an invalid response');
     }
     if (!result || typeof result !== 'object' || Array.isArray(result)) {
@@ -213,6 +222,11 @@ export async function forwardMiniAppSubmission(data, context = {}) {
       throw new MiniAppForwardError('Backend timeout', 502, 'UPSTREAM_TIMEOUT');
     }
     if (error instanceof MiniAppForwardError) throw error;
+    logger.error('MiniApp submit: runtime unreachable', {
+      error: error?.message || String(error),
+      name: error?.name || 'Error',
+      requestId
+    });
     throw new MiniAppForwardError('Backend unreachable');
   } finally {
     clearTimeout(timeoutId);

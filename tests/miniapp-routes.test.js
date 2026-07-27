@@ -159,6 +159,29 @@ test('upstream 4xx status is preserved and upstream 5xx becomes 502', async () =
   );
 });
 
+test('rejected upstream response bodies are cancelled before returning', async () => {
+  let cancelled = false;
+  await assert.rejects(
+    forwardMiniAppSubmission(
+      { type: 'service_request' },
+      {
+        runtime: { baseUrl: 'http://runtime.test' },
+        fetchImpl: async () => ({
+          ok: false,
+          status: 422,
+          body: {
+            async cancel() {
+              cancelled = true;
+            }
+          }
+        })
+      }
+    ),
+    (error) => error.status === 422
+  );
+  assert.equal(cancelled, true);
+});
+
 test('malformed successful JSON is an upstream failure', async () => {
   await assert.rejects(
     forwardMiniAppSubmission(
@@ -183,6 +206,61 @@ test('runtime timeout aborts the upstream request', async () => {
     ),
     (error) => error.code === 'UPSTREAM_TIMEOUT' && error.status === 502
   );
+});
+
+test('runtime timeout while parsing a successful body stays a timeout', async () => {
+  await assert.rejects(
+    forwardMiniAppSubmission(
+      { type: 'service_request' },
+      {
+        runtime: { baseUrl: 'http://runtime.test', timeoutMs: 10 },
+        fetchImpl: async (_url, options) => ({
+          ok: true,
+          status: 200,
+          json() {
+            return new Promise((_resolve, reject) => {
+              options.signal.addEventListener('abort', () => {
+                const error = new Error('aborted while reading body');
+                error.name = 'AbortError';
+                reject(error);
+              }, { once: true });
+            });
+          }
+        })
+      }
+    ),
+    (error) => error.code === 'UPSTREAM_TIMEOUT' && error.status === 502
+  );
+});
+
+test('network failure is logged with request ID but returned as a sanitized error', async () => {
+  const originalError = console.error;
+  const lines = [];
+  console.error = (line) => lines.push(String(line));
+  try {
+    await assert.rejects(
+      forwardMiniAppSubmission(
+        { type: 'service_request' },
+        {
+          runtime: { baseUrl: 'http://runtime.test' },
+          requestId: 'request-network-failure',
+          fetchImpl: async () => {
+            throw new Error('getaddrinfo ENOTFOUND runtime.internal');
+          }
+        }
+      ),
+      (error) => (
+        error.message === 'Backend unreachable'
+        && !error.message.includes('ENOTFOUND')
+      )
+    );
+  } finally {
+    console.error = originalError;
+  }
+  assert.equal(lines.some((line) => (
+    line.includes('getaddrinfo ENOTFOUND runtime.internal')
+    && line.includes('request-network-failure')
+  )), true);
 });
 
 test('forwarder rejects an unbounded timeout configuration', async () => {

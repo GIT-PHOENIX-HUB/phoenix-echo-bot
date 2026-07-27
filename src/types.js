@@ -60,8 +60,7 @@
  */
 
 /**
- * @typedef {Object} MiniAppSubmission
- * @property {string} type - Submission type (service_request|generator_lead|maintenance_booking). quote_request is rejected until the runtime exposes a quote intake contract.
+ * @typedef {Object} MiniAppSubmissionBase
  * @property {string} name - Customer name
  * @property {string} phone - Customer phone
  * @property {string} email - Customer email
@@ -70,6 +69,37 @@
  * @property {string} [preferredDate] - Preferred service date
  * @property {string} [urgency] - Urgency level (routine|urgent|emergency)
  * @property {Object} [metadata] - Extra submission data
+ */
+
+/**
+ * @typedef {MiniAppSubmissionBase & {
+ *   type: 'service_request',
+ *   category: string,
+ *   property_type: string
+ * }} ServiceRequestSubmission
+ */
+
+/**
+ * Generator intake requires an explicit customer-selected coverage level; it
+ * is never silently defaulted by the gateway.
+ *
+ * @typedef {MiniAppSubmissionBase & {
+ *   type: 'generator_lead',
+ *   sqft: number,
+ *   load_watts: number,
+ *   coverage: 'essential'|'essentials'|'managed'|'managed_whole_home'|'full'|'full_whole_home'
+ * }} GeneratorLeadSubmission
+ */
+
+/**
+ * @typedef {MiniAppSubmissionBase & {
+ *   type: 'maintenance_booking',
+ *   service_key: string
+ * }} MaintenanceBookingSubmission
+ */
+
+/**
+ * @typedef {ServiceRequestSubmission|GeneratorLeadSubmission|MaintenanceBookingSubmission} MiniAppSubmission
  */
 
 export default {};

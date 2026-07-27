@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import test from 'node:test';
 
 import { loadConfig } from '../src/config.js';
@@ -68,7 +68,9 @@ test('runtime token supports env references from the config file', { concurrency
       assert.equal(config.runtime.timeoutMs, 1250);
     });
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    const archive = join(tmpdir(), '_ARCHIVE');
+    await mkdir(archive, { recursive: true });
+    await rename(directory, join(archive, basename(directory)));
   }
 });
 
