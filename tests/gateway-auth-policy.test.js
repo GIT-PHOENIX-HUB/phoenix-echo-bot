@@ -5,11 +5,23 @@ import { hasIndependentApiAuth } from '../src/gateway-auth-policy.js';
 
 test('only exact POST Mini App submit bypasses the generic gateway token', () => {
   assert.equal(
-    hasIndependentApiAuth({ method: 'POST', path: '/miniapp/submit' }),
+    hasIndependentApiAuth({
+      method: 'POST',
+      path: '/miniapp/submit',
+      hasTelegramInitData: true
+    }),
     true
   );
   assert.equal(
-    hasIndependentApiAuth({ method: 'GET', path: '/miniapp/submit' }),
+    hasIndependentApiAuth({ method: 'POST', path: '/miniapp/submit' }),
+    false
+  );
+  assert.equal(
+    hasIndependentApiAuth({
+      method: 'GET',
+      path: '/miniapp/submit',
+      hasTelegramInitData: true
+    }),
     false
   );
   assert.equal(

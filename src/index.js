@@ -343,7 +343,8 @@ app.use('/api', (req, res, next) => {
   if (hasIndependentApiAuth({
     method: req.method,
     path: req.path,
-    teamsEnabled: Boolean(teamsRouteHandler)
+    teamsEnabled: Boolean(teamsRouteHandler),
+    hasTelegramInitData: Boolean(req.get('X-Telegram-Init-Data')?.trim())
   })) {
     return next();
   }

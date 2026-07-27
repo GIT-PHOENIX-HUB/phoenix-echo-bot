@@ -5,10 +5,15 @@
  * Bot Framework authenticates Teams messages, and the Python runtime validates
  * Telegram init data forwarded by the Mini App submit route.
  */
-export function hasIndependentApiAuth({ method, path, teamsEnabled = false }) {
+export function hasIndependentApiAuth({
+  method,
+  path,
+  teamsEnabled = false,
+  hasTelegramInitData = false
+}) {
   const normalizedMethod = String(method || '').toUpperCase();
   const normalizedPath = String(path || '');
   if (normalizedMethod !== 'POST') return false;
-  if (normalizedPath === '/miniapp/submit') return true;
+  if (normalizedPath === '/miniapp/submit') return hasTelegramInitData;
   return teamsEnabled && normalizedPath === '/messages';
 }
